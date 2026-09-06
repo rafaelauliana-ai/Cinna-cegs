@@ -1,0 +1,132 @@
+@import "tailwindcss";
+
+/*
+  Identidade visual "Cinnamon Cegs":
+  tons de azul claro + branco, inspirados no Cinnamoroll (Sanrio).
+  Estilo kawaii: bordas bem arredondadas, sombras suaves, sem cantos duros.
+*/
+:root {
+  --background: #f3fbff;
+  --surface: #ffffff;
+  --surface-muted: #eaf6fd;
+  --foreground: #33465e;
+  --foreground-muted: #6b7f95;
+
+  --color-sky-50: #f3fbff;
+  --color-sky-100: #e3f5fc;
+  --color-sky-200: #c7ebf8;
+  --color-sky-300: #a3ddf2;
+  --color-sky-400: #7cccea;
+  --color-sky-500: #56b8de;
+  --color-sky-600: #3d9dc6;
+  --color-sky-700: #327ea1;
+  --color-sky-800: #2c6580;
+  --color-sky-900: #27536a;
+
+  --color-pink-100: #ffe9f2;
+  --color-pink-300: #ffc2dd;
+  --color-pink-500: #ff94c2;
+
+  --color-success-100: #e2f7ec;
+  --color-success-500: #4cbd8c;
+  --color-success-700: #2f8f68;
+
+  --color-warning-100: #fff6df;
+  --color-warning-500: #f2b93d;
+  --color-warning-700: #b8830f;
+
+  --color-danger-100: #ffe7e7;
+  --color-danger-500: #ef7d7d;
+  --color-danger-700: #c74b4b;
+
+  --radius-card: 1.75rem;
+  --radius-control: 1rem;
+  --radius-pill: 999px;
+
+  --shadow-soft: 0 10px 30px -12px rgba(86, 184, 222, 0.35);
+  --shadow-softer: 0 4px 14px -6px rgba(86, 184, 222, 0.25);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-foreground: var(--foreground);
+  --color-foreground-muted: var(--foreground-muted);
+
+  --color-sky-50: var(--color-sky-50);
+  --color-sky-100: var(--color-sky-100);
+  --color-sky-200: var(--color-sky-200);
+  --color-sky-300: var(--color-sky-300);
+  --color-sky-400: var(--color-sky-400);
+  --color-sky-500: var(--color-sky-500);
+  --color-sky-600: var(--color-sky-600);
+  --color-sky-700: var(--color-sky-700);
+  --color-sky-800: var(--color-sky-800);
+  --color-sky-900: var(--color-sky-900);
+
+  --color-pink-100: var(--color-pink-100);
+  --color-pink-300: var(--color-pink-300);
+  --color-pink-500: var(--color-pink-500);
+
+  --color-success-100: var(--color-success-100);
+  --color-success-500: var(--color-success-500);
+  --color-success-700: var(--color-success-700);
+
+  --color-warning-100: var(--color-warning-100);
+  --color-warning-500: var(--color-warning-500);
+  --color-warning-700: var(--color-warning-700);
+
+  --color-danger-100: var(--color-danger-100);
+  --color-danger-500: var(--color-danger-500);
+  --color-danger-700: var(--color-danger-700);
+
+  --radius-card: var(--radius-card);
+  --radius-control: var(--radius-control);
+  --radius-pill: var(--radius-pill);
+
+  --font-sans: var(--font-quicksand);
+  --font-heading: var(--font-baloo);
+}
+
+* {
+  border-color: var(--color-sky-200);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(circle at 15% 0%, var(--color-sky-100) 0%, transparent 45%),
+    radial-gradient(circle at 100% 20%, var(--color-pink-100) 0%, transparent 35%),
+    var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+h1,
+h2,
+h3,
+.font-heading {
+  font-family: var(--font-heading), var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+::selection {
+  background: var(--color-sky-200);
+}
+
+/* Scrollbar fofa */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-sky-50);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-sky-300);
+  border-radius: var(--radius-pill);
+}
