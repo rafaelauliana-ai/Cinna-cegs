@@ -93,7 +93,7 @@ export interface Cotacao {
   claim_id: string | null;
   user_id: string;
   product_name: string;
-  value_jpy: number | null;
+  value_usd: number | null;
   value_brl: number | null;
   product_link: string | null;
   proof_url: string | null;

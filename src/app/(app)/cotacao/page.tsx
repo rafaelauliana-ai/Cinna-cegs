@@ -1,21 +1,29 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { JPY_TO_BRL_RATE } from "@/lib/config";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { FieldGroup, Input } from "@/components/ui/Input";
-import { formatBRL } from "@/lib/utils";
+import { formatBRL, formatDate } from "@/lib/utils";
+
+interface CambioInfo {
+  rate: number;
+  markup: number;
+  updatedAt: string;
+}
 
 export default function CotacaoPage() {
   const supabase = useMemo(() => createClient(), []);
 
-  const [jpyInput, setJpyInput] = useState("");
+  const [cambio, setCambio] = useState<CambioInfo | null>(null);
+  const [cambioError, setCambioError] = useState<string | null>(null);
+
+  const [usdInput, setUsdInput] = useState("");
   const [estimatedBrl, setEstimatedBrl] = useState<number | null>(null);
 
   const [productName, setProductName] = useState("");
-  const [valueJpy, setValueJpy] = useState("");
+  const [valueUsd, setValueUsd] = useState("");
   const [valueBrl, setValueBrl] = useState("");
   const [productLink, setProductLink] = useState("");
   const [proof, setProof] = useState<File | null>(null);
@@ -24,15 +32,33 @@ export default function CotacaoPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  useEffect(() => {
+    fetch("/api/cambio")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.error) {
+          setCambioError(data.error);
+          return;
+        }
+        setCambio(data as CambioInfo);
+      })
+      .catch(() => setCambioError("Não foi possível obter a cotação do dólar agora."));
+  }, []);
+
+  function calculate(usd: number) {
+    if (!cambio) return null;
+    return usd * cambio.rate + cambio.markup;
+  }
+
   function handleCalculate() {
-    const value = Number(jpyInput);
+    const value = Number(usdInput);
     if (!Number.isFinite(value)) return;
-    setEstimatedBrl(value * JPY_TO_BRL_RATE);
+    setEstimatedBrl(calculate(value));
   }
 
   function useEstimatedValue() {
     if (estimatedBrl === null) return;
-    setValueJpy(jpyInput);
+    setValueUsd(usdInput);
     setValueBrl(estimatedBrl.toFixed(2));
   }
 
@@ -66,7 +92,7 @@ export default function CotacaoPage() {
     const { error: insertError } = await supabase.from("cotacoes").insert({
       user_id: user!.id,
       product_name: productName,
-      value_jpy: Number(valueJpy) || null,
+      value_usd: Number(valueUsd) || null,
       value_brl: Number(valueBrl) || null,
       product_link: productLink || null,
       proof_url: path,
@@ -81,7 +107,7 @@ export default function CotacaoPage() {
 
     setSuccess(true);
     setProductName("");
-    setValueJpy("");
+    setValueUsd("");
     setValueBrl("");
     setProductLink("");
     setProof(null);
@@ -89,22 +115,39 @@ export default function CotacaoPage() {
 
   return (
     <Card>
-      <CardHeader icon="💰" title="Cotação de Itens" />
+      <CardHeader icon="💵" title="Cotação em Dólar" />
       <CardBody className="flex flex-col gap-6">
         <div>
           <h3 className="mb-3 font-heading font-bold text-sky-700">
             📊 Calcular valor em Real
           </h3>
-          <FieldGroup label="Valor em Iene (¥)" htmlFor="jpy">
+
+          {cambioError && (
+            <p className="mb-3 text-sm font-semibold text-danger-700">{cambioError}</p>
+          )}
+          {cambio && (
+            <p className="mb-3 rounded-control bg-surface-muted px-3 py-2 text-xs text-foreground-muted">
+              Cotação de hoje: <strong>US$ 1 = {formatBRL(cambio.rate)}</strong> (já inclui a
+              taxa fixa de {formatBRL(cambio.markup)} sobre o total convertido) · atualizado em{" "}
+              {formatDate(cambio.updatedAt)}
+            </p>
+          )}
+
+          <FieldGroup label="Valor em Dólar (US$)" htmlFor="usd">
             <Input
-              id="jpy"
-              placeholder="Ex: 300"
+              id="usd"
+              placeholder="Ex: 30"
               inputMode="decimal"
-              value={jpyInput}
-              onChange={(e) => setJpyInput(e.target.value)}
+              value={usdInput}
+              onChange={(e) => setUsdInput(e.target.value)}
             />
           </FieldGroup>
-          <Button type="button" className="mt-3 w-full" onClick={handleCalculate}>
+          <Button
+            type="button"
+            className="mt-3 w-full"
+            onClick={handleCalculate}
+            disabled={!cambio}
+          >
             Calcular
           </Button>
 
@@ -139,13 +182,13 @@ export default function CotacaoPage() {
             />
           </FieldGroup>
 
-          <FieldGroup label="Valor em Iene (¥) *" htmlFor="valueJpy">
+          <FieldGroup label="Valor em Dólar (US$) *" htmlFor="valueUsd">
             <Input
-              id="valueJpy"
+              id="valueUsd"
               inputMode="decimal"
               required
-              value={valueJpy}
-              onChange={(e) => setValueJpy(e.target.value)}
+              value={valueUsd}
+              onChange={(e) => setValueUsd(e.target.value)}
             />
           </FieldGroup>
 

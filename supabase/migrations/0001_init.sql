@@ -277,14 +277,14 @@ create trigger trg_claims_set_updated_at
   for each row execute function public.set_updated_at();
 
 -- ----------------------------------------------------------------------------
--- 5. COTAÇÕES (confirmação de compra internacional)
+-- 5. COTAÇÕES (confirmação de compra internacional, em Dólar)
 -- ----------------------------------------------------------------------------
 create table public.cotacoes (
   id uuid primary key default gen_random_uuid(),
   claim_id uuid references public.claims (id) on delete set null,
   user_id uuid not null references public.profiles (id) on delete cascade,
   product_name text not null,
-  value_jpy numeric(10, 2),
+  value_usd numeric(10, 2),
   value_brl numeric(10, 2),
   product_link text,
   proof_url text,

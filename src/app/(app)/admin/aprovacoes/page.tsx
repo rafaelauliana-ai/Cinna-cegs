@@ -173,7 +173,7 @@ export default function AdminAprovacoesPage() {
                             @{c.profiles?.username} — {c.product_name}
                           </p>
                           <p className="text-xs text-foreground-muted">
-                            ¥{c.value_jpy} · {formatBRL(c.value_brl)} ·{" "}
+                            US$ {c.value_usd} · {formatBRL(c.value_brl)} ·{" "}
                             {c.product_link && (
                               <a href={c.product_link} target="_blank" className="text-sky-600 hover:underline">
                                 link

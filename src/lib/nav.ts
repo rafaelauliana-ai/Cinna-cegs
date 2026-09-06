@@ -68,7 +68,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Cotação",
     icon: Calculator,
     tourId: "nav-cotacao",
-    tourText: "Converta Iene para Real e confirme uma compra feita, anexando o comprovante.",
+    tourText: "Converta Dólar para Real (com a cotação do dia + taxa) e confirme uma compra feita, anexando o comprovante.",
   },
   {
     href: "/repasse",

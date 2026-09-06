@@ -75,8 +75,7 @@ Alguns conteúdos foram deixados como placeholder (marcados com `TODO`) porque n
 acesso ao site informativo `cinnamon-cegs.vercel.app` para copiar os textos reais:
 
 - `src/app/regras/page.tsx` — texto completo das Regras da Comunidade.
-- `src/lib/config.ts` — chave PIX, link de pagamento por cartão e a cotação do iene
-  usada na calculadora.
+- `src/lib/config.ts` — link de pagamento por cartão (a chave PIX já está configurada).
 
 ## Estrutura do projeto
 
@@ -97,7 +96,7 @@ src/
     data/          → funções de busca de dados (dashboard, claims)
     nav.ts         → itens do menu lateral (usado também pelo tutorial)
     status.ts      → labels/cores dos status de claim
-    config.ts      → configs editáveis (PIX, cotação do iene)
+    config.ts      → configs editáveis (PIX, taxa fixa sobre a cotação do dólar)
 supabase/
   migrations/0001_init.sql   → schema completo do banco + RLS + storage
 ```
@@ -113,6 +112,19 @@ Toda regra de acesso é aplicada no banco (Postgres RLS), não só no front-end:
 - Usernames (`@usuario`) são expostos com segurança via RPCs dedicadas (login,
   "combinar envio com outro joiner", Lojinha) sem vazar o resto do profile.
 - A master tem acesso total via a função `public.is_master()`.
+
+## Cotação em Dólar
+
+A tela **Cotação** converte Dólar → Real usando a cotação do dia (via
+[AwesomeAPI](https://docs.awesomeapi.com.br/api-de-moedas), gratuita e sem chave),
+somando automaticamente uma taxa fixa por cima do valor convertido
+(`USD_MARKUP_BRL` em `src/lib/config.ts`, hoje R$ 4,00). A cotação é buscada pela rota
+`src/app/api/cambio/route.ts` e cacheada por 1h no servidor.
+
+> Se você já rodou `0001_init.sql` no Supabase antes desta mudança, rode também:
+> ```sql
+> alter table public.cotacoes rename column value_jpy to value_usd;
+> ```
 
 ## Tutorial interativo
 

@@ -9,11 +9,6 @@ export function formatBRL(value: number | null | undefined): string {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export function formatJPY(value: number | null | undefined): string {
-  const v = value ?? 0;
-  return `¥ ${v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`;
-}
-
 export function formatDate(value: string | Date | null | undefined): string {
   if (!value) return "—";
   const d = typeof value === "string" ? new Date(value) : value;
