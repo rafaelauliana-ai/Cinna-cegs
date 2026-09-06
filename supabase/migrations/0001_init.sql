@@ -122,6 +122,21 @@ $$;
 revoke all on function public.find_joiner_by_username(text) from public;
 grant execute on function public.find_joiner_by_username(text) to authenticated;
 
+-- RPC usada na Lojinha para mostrar "@usuario" do dono de cada item, sem
+-- expor o resto do profile (endereço, telefone, CPF) de outros usuários.
+create or replace function public.list_usernames(p_ids uuid[])
+returns table (id uuid, username text)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select id, username from public.profiles where id = any(p_ids);
+$$;
+
+revoke all on function public.list_usernames(uuid[]) from public;
+grant execute on function public.list_usernames(uuid[]) to authenticated;
+
 -- Utilitário genérico usado por várias tabelas com coluna updated_at.
 create or replace function public.set_updated_at()
 returns trigger

@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_ROUTES = ["/login", "/cadastro"];
+const ALWAYS_PUBLIC_ROUTES = ["/regras"];
 const ADMIN_PREFIX = "/admin";
 
 export async function updateSession(request: NextRequest) {
@@ -32,6 +33,11 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isPublicRoute = PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
+  const isAlwaysPublicRoute = ALWAYS_PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
+
+  if (isAlwaysPublicRoute) {
+    return response;
+  }
 
   if (!user && !isPublicRoute && pathname !== "/") {
     const url = request.nextUrl.clone();
