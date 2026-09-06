@@ -1,36 +1,121 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cinnamon Cegs — Site Funcional
 
-## Getting Started
+Plataforma da comunidade de compras em grupo (CEG) **Cinnamon Cegs**: login individual
+por joiner, painéis interativos (claims, cotação, repasses, envios, lojinha, Pocamarket,
+avisos) e uma área administrativa completa para a Rafaela (@pur_pleki).
 
-First, run the development server:
+Identidade visual em tons de azul claro e branco, estilo fofo/kawaii inspirado no
+Cinnamoroll.
+
+## Stack
+
+- **Front-end**: Next.js (App Router) + TypeScript + Tailwind CSS
+- **Banco de dados + autenticação**: [Supabase](https://supabase.com) (Postgres + Auth +
+  Storage), com Row Level Security implementando dois níveis de acesso:
+  - **master** (Rafaela): acesso total a todos os dados
+  - **joiner** (membros): só vê e edita os próprios dados
+- **Hospedagem**: Vercel
+
+Ambos os planos gratuitos cobrem folgadamente uma comunidade de ~60 pessoas.
+
+## Como colocar no ar
+
+### 1. Criar o projeto no Supabase
+
+1. Crie um projeto em [supabase.com/dashboard](https://supabase.com/dashboard).
+2. Abra **SQL Editor**, cole o conteúdo de `supabase/migrations/0001_init.sql` e clique em
+   **Run**. Isso cria todas as tabelas, os buckets de arquivo e as políticas de segurança
+   (RLS).
+3. Em **Project Settings → API**, copie:
+   - **Project URL**
+   - **anon public key**
+
+### 2. Configurar as variáveis de ambiente
+
+Copie `.env.example` para `.env.local` e preencha com os valores do passo anterior:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 3. Rodar localmente
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Acesse `http://localhost:3000`, crie sua conta pela tela de **Cadastro** usando o
+identificador `@pur_pleki` (ou `@pur_plekii`).
 
-## Learn More
+### 4. Virar administradora (master)
 
-To learn more about Next.js, take a look at the following resources:
+Depois de criar sua conta, volte ao **SQL Editor** do Supabase e rode:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```sql
+update public.profiles set role = 'master'
+where username in ('pur_pleki', 'pur_plekii');
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Isso libera o menu **Administração** só para você.
 
-## Deploy on Vercel
+### 5. Publicar na Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Em [vercel.com](https://vercel.com), clique em **Add New Project** e importe este
+   repositório do GitHub.
+2. Adicione as mesmas duas variáveis de ambiente (`NEXT_PUBLIC_SUPABASE_URL` e
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY`) nas configurações do projeto na Vercel.
+3. Clique em **Deploy**.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+A partir daí, todo push nesta branch gera um novo deploy automaticamente.
+
+## O que ainda precisa da sua revisão
+
+Alguns conteúdos foram deixados como placeholder (marcados com `TODO`) porque não tive
+acesso ao site informativo `cinnamon-cegs.vercel.app` para copiar os textos reais:
+
+- `src/app/regras/page.tsx` — texto completo das Regras da Comunidade.
+- `src/lib/config.ts` — chave PIX, link de pagamento por cartão e a cotação do iene
+  usada na calculadora.
+
+## Estrutura do projeto
+
+```
+src/
+  app/
+    (auth)/login, (auth)/cadastro      → telas de autenticação
+    (app)/...                          → telas logadas (dashboard, claims, lojinha...)
+    (app)/admin/...                    → painel administrativo (só master)
+    regras/                            → página pública de regras
+  components/
+    ui/            → design system (Button, Card, Input, Badge, StatCard...)
+    shell/         → sidebar + layout do app
+    tour/          → tutorial interativo "Como Usar"
+    claims/        → componentes específicos de claims
+  lib/
+    supabase/      → clientes Supabase (browser/server/middleware) + tipos
+    data/          → funções de busca de dados (dashboard, claims)
+    nav.ts         → itens do menu lateral (usado também pelo tutorial)
+    status.ts      → labels/cores dos status de claim
+    config.ts      → configs editáveis (PIX, cotação do iene)
+supabase/
+  migrations/0001_init.sql   → schema completo do banco + RLS + storage
+```
+
+## Segurança (RLS)
+
+Toda regra de acesso é aplicada no banco (Postgres RLS), não só no front-end:
+
+- Cada joiner só enxerga e edita as próprias claims, cotações, repasses, envios,
+  comprovantes e reportes.
+- Endereço, telefone e CPF de um joiner só são visíveis para ele mesmo e para a master
+  (necessário para ela organizar envios).
+- Usernames (`@usuario`) são expostos com segurança via RPCs dedicadas (login,
+  "combinar envio com outro joiner", Lojinha) sem vazar o resto do profile.
+- A master tem acesso total via a função `public.is_master()`.
+
+## Tutorial interativo
+
+O item **"Como Usar"** no menu abre um tour guiado (sem depender de bibliotecas
+externas) que destaca cada parte da interface e explica sua função — dá pra avançar
+clicando em "Próximo" ou diretamente no item destacado.
