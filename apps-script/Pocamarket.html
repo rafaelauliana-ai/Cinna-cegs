@@ -1,0 +1,55 @@
+<section class="page" id="page-pocamarket" hidden>
+  <div class="card">
+    <div class="card-header">🛒 Pocamarket</div>
+    <div class="card-body">
+      <p class="hint">Buscando um grupo específico? Envie o link do anúncio e acompanhe o status aqui.</p>
+      <form id="pmForm">
+        <div class="field"><label>Buscar grupo (opcional)</label><input id="pmQuery"></div>
+        <div class="field"><label>Link do anúncio *</label><input id="pmLink" type="url" required></div>
+        <button class="btn" type="submit" style="width: 100%;">Enviar pedido</button>
+      </form>
+
+      <h3 class="heading" style="color: var(--sky-700); margin-top: 20px;">📋 Meus pedidos</h3>
+      <div id="pmList"><p>Carregando...</p></div>
+    </div>
+  </div>
+</section>
+
+<script>
+  var PM_STATUS_TONE = { pendente: "warning", em_andamento: "sky", concluido: "success", cancelado: "danger" };
+
+  function init_pocamarket() {
+    document.getElementById("pmForm").onsubmit = pm_submit;
+    pm_load();
+  }
+
+  function pm_load() {
+    var el = document.getElementById("pmList");
+    el.innerHTML = "<p>Carregando...</p>";
+    authedCall("getMyPocamarketRequests").then(function (list) {
+      if (list.length === 0) { el.innerHTML = '<div class="empty">🛒 Você ainda não fez nenhum pedido.</div>'; return; }
+      el.innerHTML = list.map(function (r) {
+        return '<div style="border:2px solid var(--sky-100); border-radius:var(--radius-control); padding:12px; margin-bottom:8px;">' +
+          '<div class="row between"><a href="' + r.listing_link + '" target="_blank" style="color:var(--sky-600); font-weight:700;">' +
+          escapeHtml(r.group_query || r.listing_link) + '</a><span class="badge ' + PM_STATUS_TONE[r.status] + '">' + r.status + "</span></div>" +
+          (r.admin_notes ? '<p class="hint">📝 ' + escapeHtml(r.admin_notes) + "</p>" : "") +
+          '<p class="hint">Enviado em ' + formatDate(r.created_at) + "</p></div>";
+      }).join("");
+    });
+  }
+
+  function pm_submit(e) {
+    e.preventDefault();
+    var btn = e.target.querySelector("button");
+    btn.disabled = true;
+    authedCall("createPocamarketRequest", {
+      groupQuery: document.getElementById("pmQuery").value,
+      listingLink: document.getElementById("pmLink").value,
+    }).then(function () {
+      toast("Pedido enviado!", "success");
+      e.target.reset();
+      pm_load();
+    }).catch(function (err) { toast(friendlyError(err), "error"); })
+      .finally(function () { btn.disabled = false; });
+  }
+</script>

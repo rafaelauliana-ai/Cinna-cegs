@@ -1,5 +1,11 @@
 # Cinnamon Cegs — Site Funcional
 
+> ⚠️ **Versão ativa**: a comunidade está usando a versão **Google Apps Script**,
+> em [`apps-script/`](./apps-script/README.md) — comece por ali (tem o passo a
+> passo completo de publicação). O restante deste README documenta a versão
+> Next.js + Supabase, mantida no repositório apenas como referência caso um
+> dia queira migrar pra ela.
+
 Plataforma da comunidade de compras em grupo (CEG) **Cinnamon Cegs**: login individual
 por joiner, painéis interativos (claims, cotação, repasses, envios, lojinha, Pocamarket,
 avisos) e uma área administrativa completa para a Rafaela (@pur_pleki).

@@ -1,0 +1,79 @@
+<section class="page" id="page-comprovante" hidden>
+  <div class="card">
+    <div class="card-header">📤 Enviar Comprovante de Pagamento</div>
+    <div class="card-body">
+      <p class="hint">Selecione as claims que deseja enviar comprovante</p>
+      <div id="cpList"><p>Carregando...</p></div>
+
+      <div id="cpFormWrap" class="hidden">
+        <div class="field" style="margin-top: 12px;">
+          <label>Comprovante</label>
+          <input id="cpProof" type="file" accept=".pdf,.jpg,.jpeg,.png">
+        </div>
+        <p id="cpError" style="color: var(--danger-700); font-weight: 700; display: none;"></p>
+        <button class="btn success" id="cpBtn" onclick="cp_submit()">Enviar Comprovante</button>
+      </div>
+
+      <ul id="cpPayment" style="background: var(--surface-muted); border-radius: var(--radius-control); padding: 16px; margin-top: 16px; font-size: 0.9rem;"></ul>
+    </div>
+  </div>
+</section>
+
+<script>
+  var cp_selected = [];
+
+  function init_comprovante() {
+    cp_selected = [];
+    document.getElementById("cpList").innerHTML = "<p>Carregando...</p>";
+    authedCall("getClaimsAguardandoPagamento").then(function (claims) {
+      var el = document.getElementById("cpList");
+      var formWrap = document.getElementById("cpFormWrap");
+      if (claims.length === 0) {
+        el.innerHTML = '<div class="empty">✅ Nenhuma claim aguardando pagamento.</div>';
+        formWrap.classList.add("hidden");
+        return;
+      }
+      formWrap.classList.remove("hidden");
+      el.innerHTML = claims.map(function (c) {
+        return '<label class="row" style="border:2px solid var(--sky-100); border-radius:var(--radius-control); padding:10px; margin-bottom:8px;">' +
+          '<input type="checkbox" onchange="cp_toggle(\'' + c.id + '\', this.checked)" style="width:auto;">' +
+          '<span style="flex:1;">' + escapeHtml(c.ceg_name) + "</span><strong>" + formatBRL(c.total_value) + "</strong></label>";
+      }).join("");
+    });
+
+    apiCall("getPaymentMethods").then(function (methods) {
+      document.getElementById("cpPayment").innerHTML =
+        "<li><strong>Formas de pagamento:</strong></li>" +
+        "<li><strong>PIX:</strong> " + escapeHtml(methods.pixKey) + "</li>" +
+        '<li><strong>Cartão:</strong> <a href="' + methods.cardLink + '" target="_blank" style="color: var(--sky-600);">' + methods.cardLink + "</a> (selecione \"Pagar com cartão\")</li>";
+    });
+  }
+
+  function cp_toggle(id, checked) {
+    if (checked) cp_selected.push(id);
+    else cp_selected = cp_selected.filter(function (i) { return i !== id; });
+  }
+
+  function cp_submit() {
+    var errEl = document.getElementById("cpError");
+    errEl.style.display = "none";
+    if (cp_selected.length === 0) { errEl.textContent = "Selecione ao menos uma claim."; errEl.style.display = "block"; return; }
+    var fileInput = document.getElementById("cpProof");
+    if (!fileInput.files[0]) { errEl.textContent = "Anexe o comprovante."; errEl.style.display = "block"; return; }
+
+    var btn = document.getElementById("cpBtn");
+    btn.disabled = true; btn.textContent = "Enviando...";
+
+    fileToBase64(fileInput.files[0]).then(function (base64) {
+      return authedCall("uploadFile", { base64: base64, filename: fileInput.files[0].name, mimeType: fileInput.files[0].type, subFolder: "comprovantes" });
+    }).then(function (uploaded) {
+      return authedCall("sendComprovante", { claimIds: cp_selected, proofFileId: uploaded.fileId });
+    }).then(function () {
+      toast("Comprovante enviado!", "success");
+      init_comprovante();
+    }).catch(function (err) {
+      errEl.textContent = friendlyError(err);
+      errEl.style.display = "block";
+    }).finally(function () { btn.disabled = false; btn.textContent = "Enviar Comprovante"; });
+  }
+</script>

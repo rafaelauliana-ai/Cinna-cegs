@@ -1,0 +1,119 @@
+<section class="page" id="page-lojinha" hidden>
+  <div class="card">
+    <div class="card-header">
+      🛍️ Lojinha
+      <div class="toggle-group">
+        <button id="ljTabTodos" class="active" onclick="lj_setTab('todos')">Todos</button>
+        <button id="ljTabMeus" onclick="lj_setTab('meus')">Meus Anúncios</button>
+        <button id="ljTabAnunciar" onclick="lj_setTab('anunciar')">+ Anunciar</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div id="ljTodos"><p>Carregando...</p></div>
+
+      <div id="ljMeus" class="hidden"><p>Carregando...</p></div>
+
+      <form id="ljForm" class="hidden">
+        <div class="field"><label>Título *</label><input id="ljTitle" required></div>
+        <div class="field"><label>Descrição</label><textarea id="ljDescription" rows="3"></textarea></div>
+        <div class="field"><label>Valor (R$) *</label><input id="ljPrice" required></div>
+        <div class="field"><label>Foto</label><input id="ljImage" type="file" accept="image/*"></div>
+        <button class="btn" type="submit" style="width: 100%;">Publicar anúncio</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<script>
+  var lj_tab = "todos";
+
+  function init_lojinha() {
+    lj_setTab("todos");
+    document.getElementById("ljForm").onsubmit = lj_submit;
+  }
+
+  function lj_setTab(tab) {
+    lj_tab = tab;
+    ["Todos", "Meus", "Anunciar"].forEach(function (t) {
+      document.getElementById("ljTab" + t).classList.toggle("active", t.toLowerCase() === tab);
+    });
+    document.getElementById("ljTodos").classList.toggle("hidden", tab !== "todos");
+    document.getElementById("ljMeus").classList.toggle("hidden", tab !== "meus");
+    document.getElementById("ljForm").classList.toggle("hidden", tab !== "anunciar");
+
+    if (tab === "todos") lj_loadTodos();
+    if (tab === "meus") lj_loadMeus();
+  }
+
+  function lj_card(item, isOwner) {
+    var actionHtml = isOwner
+      ? '<select onchange="lj_updateStatus(\'' + item.id + '\', this.value)" style="margin-top:8px;">' +
+        ["disponivel", "reservado", "vendido", "cancelado"].map(function (s) {
+          return '<option value="' + s + '"' + (s === item.status ? " selected" : "") + ">" + s + "</option>";
+        }).join("") + "</select>"
+      : '<a href="https://wa.me/?text=' + encodeURIComponent('Tenho interesse no item "' + item.title + '" (' + formatBRL(item.price) + ') da Lojinha Cinnamon Cegs!') +
+        '" target="_blank" class="btn success" style="width:100%; margin-top:8px; text-decoration:none;">💬 Tenho interesse!</a>';
+
+    return '<div style="border:2px solid var(--sky-100); border-radius:var(--radius-card); overflow:hidden;">' +
+      (item.image_url ? '<img src="' + item.image_url + '" style="width:100%; height:140px; object-fit:cover;">' : "") +
+      '<div style="padding:14px;"><strong>' + escapeHtml(item.title) + "</strong>" +
+      (item.description ? '<p class="hint">' + escapeHtml(item.description) + "</p>" : "") +
+      '<p style="font-weight:800; color:var(--sky-700); font-size:1.1rem;">' + formatBRL(item.price) + "</p>" +
+      '<span class="badge sky">Repasse</span> <span class="badge success">' + item.status + '</span> <span class="hint">@' + escapeHtml(item.owner_username) + "</span>" +
+      actionHtml + "</div></div>";
+  }
+
+  function lj_loadTodos() {
+    var el = document.getElementById("ljTodos");
+    el.innerHTML = "<p>Carregando...</p>";
+    authedCall("listLojinhaDisponiveis").then(function (items) {
+      if (items.length === 0) { el.innerHTML = '<div class="empty">🛍️ Nenhum item disponível no momento.</div>'; return; }
+      el.innerHTML = '<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px;">' +
+        items.map(function (i) { return lj_card(i, i.owner_id === App.state.user.id); }).join("") + "</div>";
+    });
+  }
+
+  function lj_loadMeus() {
+    var el = document.getElementById("ljMeus");
+    el.innerHTML = "<p>Carregando...</p>";
+    authedCall("listMyLojinhaItems").then(function (items) {
+      if (items.length === 0) { el.innerHTML = '<div class="empty">📭 Você ainda não anunciou nenhum item.</div>'; return; }
+      el.innerHTML = '<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px;">' +
+        items.map(function (i) { return lj_card(i, true); }).join("") + "</div>";
+    });
+  }
+
+  function lj_updateStatus(id, status) {
+    authedCall("updateLojinhaItemStatus", id, status).then(function () {
+      toast("Status atualizado!", "success");
+      if (lj_tab === "todos") lj_loadTodos(); else lj_loadMeus();
+    });
+  }
+
+  function lj_submit(e) {
+    e.preventDefault();
+    var btn = e.target.querySelector("button");
+    btn.disabled = true; btn.textContent = "Publicando...";
+
+    var fileInput = document.getElementById("ljImage");
+    var uploadPromise = fileInput.files[0]
+      ? fileToBase64(fileInput.files[0]).then(function (base64) {
+          return authedCall("uploadFile", { base64: base64, filename: fileInput.files[0].name, mimeType: fileInput.files[0].type, subFolder: "lojinha" });
+        })
+      : Promise.resolve(null);
+
+    uploadPromise.then(function (uploaded) {
+      return authedCall("createLojinhaItem", {
+        title: document.getElementById("ljTitle").value,
+        description: document.getElementById("ljDescription").value,
+        price: document.getElementById("ljPrice").value,
+        imageUrl: uploaded ? uploaded.url : "",
+      });
+    }).then(function () {
+      toast("Anúncio publicado!", "success");
+      e.target.reset();
+      lj_setTab("meus");
+    }).catch(function (err) { toast(friendlyError(err), "error"); })
+      .finally(function () { btn.disabled = false; btn.textContent = "Publicar anúncio"; });
+  }
+</script>

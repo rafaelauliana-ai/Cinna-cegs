@@ -1,0 +1,71 @@
+<section class="page" id="page-avisos" hidden>
+  <div class="card">
+    <div class="card-header">
+      🔔 Avisos
+      <button class="btn secondary sm" onclick="av_markAllRead()">✓ Marcar todos como lido</button>
+    </div>
+    <div class="card-body">
+      <p class="hint">Acompanhe os avisos do sistema: novas CEGs, status alterado, comprovantes, cotações e mais.</p>
+      <div class="row" style="margin: 12px 0;">
+        <select id="avFilterStatus" onchange="av_render()" style="flex: 1;">
+          <option value="nao_visualizados">Não visualizados</option>
+          <option value="visualizados">Visualizados</option>
+          <option value="todos">Todos</option>
+        </select>
+      </div>
+      <div id="avList"><p>Carregando...</p></div>
+    </div>
+  </div>
+</section>
+
+<script>
+  var av_avisos = [];
+  var AVISO_TYPE_LABEL = {
+    compra_lojinha: "🛒 Compra na Lojinha", comprovante_enviado: "📎 Comprovante enviado",
+    envio_solicitado: "🚚 Envio solicitado", nova_ceg: "📣 Nova CEG", status_alterado: "📌 Status alterado",
+    valores_atualizados: "💰 Valores atualizados", cotacao: "💰 Cotação", geral: "📣 Geral",
+    reporte_atualizado: "📋 Reporte atualizado",
+  };
+
+  function init_avisos() {
+    document.getElementById("avList").innerHTML = "<p>Carregando...</p>";
+    authedCall("getMyAvisos").then(function (avisos) {
+      av_avisos = avisos;
+      av_render();
+    });
+  }
+
+  function av_render() {
+    var filter = document.getElementById("avFilterStatus").value;
+    var list = av_avisos.filter(function (a) {
+      if (filter === "nao_visualizados") return !a.is_read;
+      if (filter === "visualizados") return a.is_read;
+      return true;
+    });
+    var el = document.getElementById("avList");
+    if (list.length === 0) { el.innerHTML = '<div class="empty">📭 Nenhum aviso encontrado.</div>'; return; }
+    el.innerHTML = list.map(function (a) {
+      return '<div style="border:2px solid ' + (a.is_read ? "var(--sky-50)" : "var(--sky-200)") + "; background:" + (a.is_read ? "#fff" : "var(--sky-50)") +
+        '; border-radius:var(--radius-control); padding:12px; margin-bottom:8px;">' +
+        '<div class="row between"><strong>' + (AVISO_TYPE_LABEL[a.type] || a.type) + " — " + escapeHtml(a.title) + "</strong>" +
+        (!a.is_read ? '<a href="#" onclick="av_markRead(\'' + a.id + '\'); return false;" style="font-size:0.8rem; color:var(--sky-600);">marcar como lido</a>' : "") + "</div>" +
+        (a.message ? '<p class="hint">' + escapeHtml(a.message) + "</p>" : "") +
+        '<p class="hint">' + formatDate(a.created_at) + "</p></div>";
+    }).join("");
+  }
+
+  function av_markRead(id) {
+    authedCall("markAvisoRead", id).then(function () {
+      av_avisos.forEach(function (a) { if (a.id === id) a.is_read = true; });
+      av_render();
+    });
+  }
+
+  function av_markAllRead() {
+    authedCall("markAllAvisosRead").then(function () {
+      av_avisos.forEach(function (a) { a.is_read = true; });
+      av_render();
+      toast("Todos marcados como lidos!", "success");
+    });
+  }
+</script>

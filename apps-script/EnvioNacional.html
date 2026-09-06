@@ -1,0 +1,98 @@
+<section class="page" id="page-envioNacional" hidden>
+  <div class="card">
+    <div class="card-header">🚚 Envio Nacional</div>
+    <div class="card-body">
+      <p class="hint">Selecione as claims com status <strong>Nacional Liberado</strong> para solicitar envio.</p>
+
+      <h3 class="heading" style="color: var(--sky-700); margin-top: 16px;">📦 Meus envios solicitados</h3>
+      <div id="envHistory"></div>
+
+      <h3 class="heading" style="color: var(--sky-700); margin-top: 20px;">📦 Solicitar Envio</h3>
+      <div id="envList"><p>Carregando...</p></div>
+
+      <label class="row" style="margin-top: 12px; align-items: flex-start;">
+        <input type="checkbox" id="envCombine" style="width: auto; margin-top: 4px;" onchange="envio_toggleCombine()">
+        <span><strong>📦 Quero solicitar o envio com outro joiner</strong><br>
+        <span class="hint">Marque se os itens serão enviados junto com os de outro joiner.</span></span>
+      </label>
+
+      <div id="envCombineBox" class="hidden" style="background: var(--surface-muted); border-radius: var(--radius-control); padding: 12px; margin-top: 8px;">
+        <div class="row">
+          <input id="envOtherUsername" placeholder="@usuario do outro joiner" style="flex: 1;">
+          <button class="btn secondary" onclick="envio_findOther()">Buscar</button>
+        </div>
+        <p id="envOtherResult" class="hint"></p>
+      </div>
+
+      <button class="btn success" id="envBtn" style="margin-top: 16px;" onclick="envio_submit()">Solicitar Envio</button>
+    </div>
+  </div>
+</section>
+
+<script>
+  var envio_selected = [];
+  var envio_otherUser = null;
+
+  function init_envioNacional() {
+    envio_selected = [];
+    envio_otherUser = null;
+    document.getElementById("envCombine").checked = false;
+    document.getElementById("envCombineBox").classList.add("hidden");
+    document.getElementById("envOtherResult").textContent = "";
+
+    document.getElementById("envList").innerHTML = "<p>Carregando...</p>";
+    authedCall("getClaimsLiberadas").then(function (claims) {
+      var el = document.getElementById("envList");
+      if (claims.length === 0) { el.innerHTML = '<div class="empty">📭 Não há nenhuma claim correspondente.</div>'; return; }
+      el.innerHTML = claims.map(function (c) {
+        return '<label class="row" style="border:2px solid var(--sky-100); border-radius:var(--radius-control); padding:10px; margin-bottom:8px;">' +
+          '<input type="checkbox" onchange="envio_toggle(\'' + c.id + '\', this.checked)" style="width:auto;">' +
+          '<span style="flex:1;">' + escapeHtml(c.ceg_name) + "</span><strong>" + formatBRL(c.total_value) + "</strong></label>";
+      }).join("");
+    });
+
+    authedCall("getMeusEnvios").then(function (envios) {
+      var el = document.getElementById("envHistory");
+      if (envios.length === 0) { el.innerHTML = '<p class="hint">Nenhum envio solicitado ainda.</p>'; return; }
+      el.innerHTML = envios.map(function (e) {
+        return '<div class="row between" style="background:var(--surface-muted); padding:10px; border-radius:var(--radius-control); margin-bottom:6px;">' +
+          "<span>Solicitado em " + formatDate(e.created_at) + '</span><span class="badge ' + (e.status === "entregue" ? "success" : "sky") + '">' + e.status + "</span></div>";
+      }).join("");
+    });
+  }
+
+  function envio_toggle(id, checked) {
+    if (checked) envio_selected.push(id);
+    else envio_selected = envio_selected.filter(function (i) { return i !== id; });
+  }
+
+  function envio_toggleCombine() {
+    document.getElementById("envCombineBox").classList.toggle("hidden", !document.getElementById("envCombine").checked);
+  }
+
+  function envio_findOther() {
+    var username = document.getElementById("envOtherUsername").value;
+    authedCall("findJoinerByUsername", username).then(function (user) {
+      if (!user) { document.getElementById("envOtherResult").innerHTML = '<span style="color:var(--danger-700);">Joiner não encontrado.</span>'; return; }
+      envio_otherUser = user;
+      document.getElementById("envOtherResult").innerHTML = '<span style="color:var(--success-700);">✓ Encontrado: ' + escapeHtml(user.full_name) + "</span>";
+    });
+  }
+
+  function envio_submit() {
+    if (envio_selected.length === 0) { toast("Selecione ao menos uma claim.", "error"); return; }
+    var combine = document.getElementById("envCombine").checked;
+    if (combine && !envio_otherUser) { toast("Busque e confirme o @ do outro joiner.", "error"); return; }
+
+    var btn = document.getElementById("envBtn");
+    btn.disabled = true;
+    authedCall("requestEnvioNacional", {
+      claimIds: envio_selected,
+      combinedWithUserId: combine ? envio_otherUser.id : null,
+    }).then(function () {
+      toast("Envio solicitado com sucesso!", "success");
+      init_envioNacional();
+    }).catch(function (err) { toast(friendlyError(err), "error"); })
+      .finally(function () { btn.disabled = false; });
+  }
+</script>

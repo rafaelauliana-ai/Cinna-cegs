@@ -1,0 +1,100 @@
+<div id="tourOverlay" class="hidden"></div>
+
+<script>
+  var Tour = { steps: [], index: 0, active: false };
+
+  function tour_buildSteps() {
+    var isMaster = App.state.user && App.state.user.role === "master";
+    var steps = [
+      { title: "Bem-vinda ao tour! ☁️", text: "Vou te mostrar rapidinho pra que serve cada parte do site. Clique em \"Próximo\" (ou no próprio item destacado) para continuar.", target: null },
+    ];
+
+    if (isMaster) steps.push({ title: NAV_ADMIN.label, text: NAV_ADMIN.tour, target: '[data-tour="nav-admin"]' });
+    NAV_ITEMS.forEach(function (item) { steps.push({ title: item.label, text: item.tour, target: '[data-tour="nav-' + item.page + '"]' }); });
+    NAV_SECONDARY.forEach(function (item) { steps.push({ title: item.label, text: item.tour, target: '[data-tour="nav-' + item.page + '"]' }); });
+
+    steps.push(
+      { title: "Resumo do Dashboard", text: "Esses cards mostram, de relance, quanto você tem pendente, prazos próximos e avisos.", target: '[data-tour="dashboard-stats"]', beforeShow: function () { navigate("dashboard"); } },
+      { title: "Prontinho! 🎀", text: "Agora você já conhece o site inteiro. Sempre que precisar, volte em \"Como Usar\" pra rever esse tour.", target: null },
+    );
+    return steps;
+  }
+
+  function tour_start() {
+    Tour.steps = tour_buildSteps();
+    Tour.index = 0;
+    Tour.active = true;
+    tour_render();
+  }
+
+  function tour_stop() {
+    Tour.active = false;
+    document.getElementById("tourOverlay").classList.add("hidden");
+    document.getElementById("tourOverlay").innerHTML = "";
+  }
+
+  function tour_next() {
+    if (Tour.index >= Tour.steps.length - 1) { tour_stop(); return; }
+    Tour.index++;
+    tour_render();
+  }
+
+  function tour_prev() {
+    if (Tour.index <= 0) return;
+    Tour.index--;
+    tour_render();
+  }
+
+  function tour_render() {
+    var step = Tour.steps[Tour.index];
+    if (step.beforeShow) step.beforeShow();
+
+    var overlay = document.getElementById("tourOverlay");
+    overlay.classList.remove("hidden");
+
+    var cardHtml =
+      '<div class="tour-card" id="tourCard">' +
+      '<p class="step">Passo ' + (Tour.index + 1) + " de " + Tour.steps.length + "</p>" +
+      '<h3 class="heading" style="margin: 4px 0 8px; color: var(--sky-800);">' + escapeHtml(step.title) + "</h3>" +
+      '<p style="font-size: 0.9rem; color: var(--fg-muted);">' + escapeHtml(step.text) + "</p>" +
+      '<div class="row between" style="margin-top: 12px;">' +
+      '<a href="#" onclick="tour_stop(); return false;" style="font-size: 0.8rem; color: var(--fg-muted);">Pular tour</a>' +
+      '<div class="row">' +
+      (Tour.index > 0 ? '<button class="btn secondary sm" onclick="tour_prev()">← Anterior</button>' : "") +
+      '<button class="btn sm" onclick="tour_next()">' + (Tour.index === Tour.steps.length - 1 ? "Concluir 🎀" : "Próximo →") + "</button>" +
+      "</div></div></div>";
+
+    if (!step.target) {
+      overlay.innerHTML = '<div style="position:absolute; inset:0; background:rgba(44,101,128,0.5); display:flex; align-items:center; justify-content:center; padding:16px;">' + cardHtml + "</div>";
+      return;
+    }
+
+    var attempts = 0;
+    function tryFind() {
+      var el = document.querySelector(step.target);
+      if (!el || el.offsetParent === null) {
+        attempts++;
+        if (attempts > 30) { tour_next(); return; }
+        setTimeout(tryFind, 100);
+        return;
+      }
+      var r = el.getBoundingClientRect();
+      var pad = 8;
+      var top = r.top - pad, left = r.left - pad, w = r.width + pad * 2, h = r.height + pad * 2;
+
+      overlay.innerHTML =
+        '<div class="tour-bar" style="top:0; left:0; width:100%; height:' + Math.max(top, 0) + 'px;"></div>' +
+        '<div class="tour-bar" style="top:' + (top + h) + 'px; left:0; width:100%; bottom:0;"></div>' +
+        '<div class="tour-bar" style="top:' + top + 'px; left:0; width:' + Math.max(left, 0) + 'px; height:' + h + 'px;"></div>' +
+        '<div class="tour-bar" style="top:' + top + 'px; left:' + (left + w) + 'px; right:0; height:' + h + 'px;"></div>' +
+        '<div class="tour-frame" style="top:' + top + 'px; left:' + left + 'px; width:' + w + 'px; height:' + h + 'px;"></div>';
+
+      var cardTop = Math.min(top + h + 12, window.innerHeight - 220);
+      var cardLeft = Math.min(Math.max(left, 12), window.innerWidth - 332);
+      overlay.innerHTML += '<div style="position:absolute; top:' + cardTop + 'px; left:' + cardLeft + 'px;">' + cardHtml + "</div>";
+
+      el.onclick = function () { if (Tour.active) tour_next(); };
+    }
+    tryFind();
+  }
+</script>

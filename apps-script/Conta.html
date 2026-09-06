@@ -1,0 +1,97 @@
+<section class="page" id="page-conta" hidden>
+  <div class="card">
+    <div class="card-header">👤 Minha Conta</div>
+    <div class="card-body">
+      <form id="ctForm">
+        <h3 class="heading" style="color: var(--sky-700);">Dados Pessoais</h3>
+        <div class="field"><label>Nome</label><input id="ctFullName"></div>
+        <div class="field"><label>E-mail</label><input id="ctEmail" disabled></div>
+        <div class="field"><label>@ (identificador)</label><input id="ctUsername" disabled></div>
+        <div class="field"><label>Telefone</label><input id="ctPhone"></div>
+
+        <h3 class="heading" style="color: var(--sky-700); margin-top: 12px;">📍 Endereço</h3>
+        <p class="hint" style="margin-top: -8px;">Usado apenas pela administradora para organizar envios.</p>
+        <div class="field"><label>Rua</label><input id="ctStreet"></div>
+        <div class="row">
+          <div class="field" style="flex: 1;"><label>Número</label><input id="ctNumber"></div>
+          <div class="field" style="flex: 1;"><label>Complemento</label><input id="ctComplement"></div>
+        </div>
+        <div class="field"><label>Bairro</label><input id="ctDistrict"></div>
+        <div class="row">
+          <div class="field" style="flex: 1;"><label>Cidade</label><input id="ctCity"></div>
+          <div class="field" style="flex: 1;"><label>Estado (UF)</label><input id="ctState" maxlength="2"></div>
+        </div>
+        <div class="row">
+          <div class="field" style="flex: 1;"><label>CEP</label><input id="ctZip"></div>
+          <div class="field" style="flex: 1;"><label>CPF</label><input id="ctCpf"></div>
+        </div>
+
+        <button class="btn" type="submit" style="width: 100%;">💾 Atualizar Dados</button>
+      </form>
+
+      <div style="border-top: 1px solid var(--sky-100); margin-top: 20px; padding-top: 16px;">
+        <h3 class="heading" style="color: var(--sky-700);">🔑 Alterar Senha</h3>
+        <div class="field"><label>Nova senha</label><input id="ctNewPassword" type="password"></div>
+        <div class="field"><label>Confirmar nova senha</label><input id="ctNewPassword2" type="password"></div>
+        <button class="btn secondary" onclick="ct_changePassword()">Atualizar senha</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  function init_conta() {
+    document.getElementById("ctForm").onsubmit = ct_save;
+    authedCall("getMyProfile").then(function (u) {
+      document.getElementById("ctFullName").value = u.full_name || "";
+      document.getElementById("ctEmail").value = u.email || "";
+      document.getElementById("ctUsername").value = "@" + u.username;
+      document.getElementById("ctPhone").value = u.phone || "";
+      document.getElementById("ctStreet").value = u.address_street || "";
+      document.getElementById("ctNumber").value = u.address_number || "";
+      document.getElementById("ctComplement").value = u.address_complement || "";
+      document.getElementById("ctDistrict").value = u.address_district || "";
+      document.getElementById("ctCity").value = u.address_city || "";
+      document.getElementById("ctState").value = u.address_state || "";
+      document.getElementById("ctZip").value = u.address_zip || "";
+      document.getElementById("ctCpf").value = u.cpf || "";
+    });
+  }
+
+  function ct_save(e) {
+    e.preventDefault();
+    var btn = e.target.querySelector("button");
+    btn.disabled = true; btn.textContent = "Salvando...";
+
+    authedCall("updateMyProfile", {
+      full_name: document.getElementById("ctFullName").value,
+      phone: document.getElementById("ctPhone").value,
+      address_street: document.getElementById("ctStreet").value,
+      address_number: document.getElementById("ctNumber").value,
+      address_complement: document.getElementById("ctComplement").value,
+      address_district: document.getElementById("ctDistrict").value,
+      address_city: document.getElementById("ctCity").value,
+      address_state: document.getElementById("ctState").value,
+      address_zip: document.getElementById("ctZip").value,
+      cpf: document.getElementById("ctCpf").value,
+    }).then(function () {
+      toast("Dados atualizados!", "success");
+      App.state.user.full_name = document.getElementById("ctFullName").value;
+      document.getElementById("greeting").textContent = "Olá, " + (App.state.user.full_name.split(" ")[0] || "por aí") + "! 👋";
+    }).catch(function (err) { toast(friendlyError(err), "error"); })
+      .finally(function () { btn.disabled = false; btn.textContent = "💾 Atualizar Dados"; });
+  }
+
+  function ct_changePassword() {
+    var p1 = document.getElementById("ctNewPassword").value;
+    var p2 = document.getElementById("ctNewPassword2").value;
+    if (p1.length < 6) { toast("A senha precisa ter pelo menos 6 caracteres.", "error"); return; }
+    if (p1 !== p2) { toast("As senhas não coincidem.", "error"); return; }
+
+    authedCall("changeMyPassword", p1).then(function () {
+      toast("Senha atualizada com sucesso!", "success");
+      document.getElementById("ctNewPassword").value = "";
+      document.getElementById("ctNewPassword2").value = "";
+    }).catch(function (err) { toast(friendlyError(err), "error"); });
+  }
+</script>

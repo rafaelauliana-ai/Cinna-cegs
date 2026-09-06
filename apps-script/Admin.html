@@ -1,0 +1,371 @@
+<section class="page" id="page-admin" hidden>
+  <h2 class="heading" style="color: var(--sky-800);">🛡️ Administração</h2>
+  <div class="row" style="margin-bottom: 16px;">
+    <button class="btn secondary sm" onclick="adm_setTab('overview')">Visão Geral</button>
+    <button class="btn secondary sm" onclick="adm_setTab('cegs')">CEGs &amp; Produtos</button>
+    <button class="btn secondary sm" onclick="adm_setTab('joiners')">Joiners</button>
+    <button class="btn secondary sm" onclick="adm_setTab('claims')">Claims</button>
+    <button class="btn secondary sm" onclick="adm_setTab('avisos')">Avisos</button>
+    <button class="btn secondary sm" onclick="adm_setTab('aprovacoes')">Aprovações</button>
+  </div>
+
+  <div id="adm-overview" class="admin-tab"></div>
+
+  <div id="adm-cegs" class="admin-tab hidden card">
+    <div class="card-header">📊 CEGs &amp; Produtos</div>
+    <div class="card-body">
+      <form id="admCegForm" class="row" style="margin-bottom: 16px;">
+        <input id="admCegName" placeholder="Nome da nova CEG" style="flex: 1;">
+        <button class="btn" type="submit">+ Criar CEG</button>
+      </form>
+      <div id="admCegsList"></div>
+    </div>
+  </div>
+
+  <div id="adm-joiners" class="admin-tab hidden card">
+    <div class="card-header">👥 Joiners</div>
+    <div class="card-body">
+      <input id="admJoinerSearch" placeholder="🔍 Buscar por nome, @ ou e-mail..." oninput="adm_renderJoiners()" style="margin-bottom: 12px;">
+      <div id="admJoinersList" style="overflow-x: auto;"></div>
+    </div>
+  </div>
+
+  <div id="adm-claims" class="admin-tab hidden card">
+    <div class="card-header">📋 Todas as Claims</div>
+    <div class="card-body">
+      <input id="admClaimSearch" placeholder="🔍 Buscar por joiner ou CEG..." oninput="adm_renderClaims()" style="margin-bottom: 12px;">
+      <div id="admClaimsList" style="overflow-x: auto;"></div>
+    </div>
+  </div>
+
+  <div id="adm-avisos" class="admin-tab hidden card">
+    <div class="card-header">🔔 Enviar Aviso</div>
+    <div class="card-body">
+      <form id="admAvisoForm">
+        <div class="row">
+          <div class="field" style="flex: 1;">
+            <label>Tipo</label>
+            <select id="admAvisoType">
+              <option value="geral">📣 Geral</option><option value="nova_ceg">📣 Nova CEG</option>
+              <option value="status_alterado">📌 Status alterado</option><option value="valores_atualizados">💰 Valores atualizados</option>
+              <option value="cotacao">💰 Cotação</option><option value="comprovante_enviado">📎 Comprovante enviado</option>
+              <option value="envio_solicitado">🚚 Envio solicitado</option><option value="compra_lojinha">🛒 Compra na Lojinha</option>
+              <option value="reporte_atualizado">📋 Reporte atualizado</option>
+            </select>
+          </div>
+          <div class="field" style="flex: 1;">
+            <label>Enviar para</label>
+            <select id="admAvisoTarget"><option value="">📢 Todos os joiners</option></select>
+          </div>
+        </div>
+        <div class="field"><label>Título *</label><input id="admAvisoTitle" required></div>
+        <div class="field"><label>Mensagem</label><textarea id="admAvisoMessage" rows="3"></textarea></div>
+        <button class="btn" type="submit" style="width: 100%;">Enviar Aviso</button>
+      </form>
+      <h3 class="heading" style="color: var(--sky-700); margin-top: 16px;">Últimos avisos</h3>
+      <div id="admAvisosList"></div>
+    </div>
+  </div>
+
+  <div id="adm-aprovacoes" class="admin-tab hidden card">
+    <div class="card-header">
+      ✅ Aprovações
+      <div class="toggle-group">
+        <button id="admAprovTabcomprovantes" class="active" onclick="adm_setAprovTab('comprovantes')">Comprovantes</button>
+        <button id="admAprovTabcotacoes" onclick="adm_setAprovTab('cotacoes')">Cotações</button>
+        <button id="admAprovTabpocamarket" onclick="adm_setAprovTab('pocamarket')">Pocamarket</button>
+        <button id="admAprovTabreportes" onclick="adm_setAprovTab('reportes')">Reportes</button>
+      </div>
+    </div>
+    <div class="card-body" id="admAprovContent"></div>
+  </div>
+</section>
+
+<script>
+  var adm_tab = "overview";
+  var adm_aprovTab = "comprovantes";
+  var adm_joiners = [];
+  var adm_claims = [];
+  var adm_cegExpanded = null;
+
+  function init_admin() { adm_setTab("overview"); }
+
+  function adm_setTab(tab) {
+    adm_tab = tab;
+    document.querySelectorAll(".admin-tab").forEach(function (el) { el.classList.add("hidden"); });
+    document.getElementById("adm-" + tab).classList.remove("hidden");
+    if (tab === "overview") adm_loadOverview();
+    if (tab === "cegs") adm_loadCegs();
+    if (tab === "joiners") adm_loadJoiners();
+    if (tab === "claims") adm_loadClaims();
+    if (tab === "avisos") adm_loadAvisos();
+    if (tab === "aprovacoes") adm_setAprovTab(adm_aprovTab);
+  }
+
+  // ---------------- Overview ----------------
+  function adm_loadOverview() {
+    var el = document.getElementById("adm-overview");
+    el.innerHTML = "<p>Carregando...</p>";
+    authedCall("adminGetOverview").then(function (s) {
+      el.innerHTML = '<div class="stat-grid">' +
+        statCardHtml("👥", "Joiners", s.joiners, "", "sky") +
+        statCardHtml("📦", "Claims em aberto", s.openClaims, "", "warning") +
+        statCardHtml("📎", "Comprovantes p/ revisar", s.pendingComprovantes, "", "pink") +
+        statCardHtml("🛒", "Pocamarket pendente", s.pendingPocamarket, "", "sky") +
+        statCardHtml("🐛", "Reportes abertos", s.openReportes, "", "danger") +
+        "</div>";
+    });
+  }
+
+  // ---------------- CEGs ----------------
+  function adm_loadCegs() {
+    document.getElementById("admCegForm").onsubmit = function (e) {
+      e.preventDefault();
+      var name = document.getElementById("admCegName").value;
+      if (!name.trim()) return;
+      authedCall("adminCreateCeg", name).then(function () {
+        document.getElementById("admCegName").value = "";
+        adm_loadCegs();
+      });
+    };
+
+    var el = document.getElementById("admCegsList");
+    el.innerHTML = "<p>Carregando...</p>";
+    authedCall("listCegs").then(function (cegs) {
+      el.innerHTML = cegs.map(function (c) {
+        var expanded = adm_cegExpanded === c.id;
+        return '<div style="border:2px solid var(--sky-100); border-radius:var(--radius-control); margin-bottom:10px;">' +
+          '<div class="row between" style="padding:10px;">' +
+          '<a href="#" onclick="adm_toggleCeg(\'' + c.id + '\'); return false;" style="font-weight:800;">' + (expanded ? "▾" : "▸") + " " + escapeHtml(c.name) + "</a>" +
+          '<select onchange="adm_updateCegStatus(\'' + c.id + '\', this.value)">' +
+          ["em_andamento", "finalizada", "cancelada"].map(function (s) { return '<option value="' + s + '"' + (s === c.status ? " selected" : "") + ">" + s + "</option>"; }).join("") +
+          "</select></div>" +
+          (expanded ? '<div id="admCegProducts-' + c.id + '" style="background:var(--surface-muted); padding:10px;">Carregando produtos...</div>' : "") +
+          "</div>";
+      }).join("");
+
+      if (adm_cegExpanded) adm_loadProducts(adm_cegExpanded);
+    });
+  }
+
+  function adm_toggleCeg(id) {
+    adm_cegExpanded = adm_cegExpanded === id ? null : id;
+    adm_loadCegs();
+  }
+
+  function adm_updateCegStatus(id, status) {
+    authedCall("adminUpdateCegStatus", id, status).then(function () { toast("Status atualizado!", "success"); });
+  }
+
+  function adm_loadProducts(cegId) {
+    authedCall("listProducts", cegId).then(function (products) {
+      var el = document.getElementById("admCegProducts-" + cegId);
+      if (!el) return;
+      el.innerHTML =
+        products.map(function (p) {
+          return '<div class="row between" style="background:#fff; padding:8px; border-radius:var(--radius-control); margin-bottom:6px;">' +
+            "<span>" + escapeHtml(p.name) + " — " + formatBRL(p.price) + "</span>" +
+            '<a href="#" onclick="adm_removeProduct(\'' + cegId + '\',\'' + p.id + '\'); return false;" style="color:var(--danger-700);">remover</a></div>';
+        }).join("") +
+        '<form onsubmit="return adm_addProduct(event, \'' + cegId + '\')" class="row" style="margin-top: 8px;">' +
+        '<input placeholder="Nome" class="admProdName" style="flex:1;">' +
+        '<input placeholder="Preço" class="admProdPrice" style="width:90px;">' +
+        '<input placeholder="Variações (vírgula)" class="admProdVar" style="flex:1;">' +
+        '<button class="btn secondary sm" type="submit">+ Add</button></form>';
+    });
+  }
+
+  function adm_addProduct(e, cegId) {
+    e.preventDefault();
+    var form = e.target;
+    var name = form.querySelector(".admProdName").value;
+    var price = form.querySelector(".admProdPrice").value;
+    var vars = form.querySelector(".admProdVar").value;
+    authedCall("adminAddProduct", {
+      cegId: cegId, name: name, price: price,
+      variations: vars ? vars.split(",").map(function (v) { return v.trim(); }).filter(Boolean) : [],
+    }).then(function () { adm_loadProducts(cegId); });
+    return false;
+  }
+
+  function adm_removeProduct(cegId, productId) {
+    authedCall("adminRemoveProduct", productId).then(function () { adm_loadProducts(cegId); });
+  }
+
+  // ---------------- Joiners ----------------
+  function adm_loadJoiners() {
+    document.getElementById("admJoinersList").innerHTML = "<p>Carregando...</p>";
+    authedCall("adminGetJoiners").then(function (joiners) {
+      adm_joiners = joiners;
+      adm_renderJoiners();
+    });
+  }
+
+  function adm_renderJoiners() {
+    var term = document.getElementById("admJoinerSearch").value.toLowerCase();
+    var list = adm_joiners.filter(function (j) {
+      return j.full_name.toLowerCase().indexOf(term) !== -1 || j.username.toLowerCase().indexOf(term) !== -1 || j.email.toLowerCase().indexOf(term) !== -1;
+    });
+    document.getElementById("admJoinersList").innerHTML =
+      "<table><thead><tr><th>Nome</th><th>@</th><th>Contato</th><th>Endereço</th><th>Papel</th></tr></thead><tbody>" +
+      list.map(function (j) {
+        var address = j.address_street
+          ? j.address_street + ", " + j.address_number + (j.address_complement ? " - " + j.address_complement : "") + "<br>" +
+            j.address_district + " — " + j.address_city + "/" + j.address_state + "<br>CEP " + j.address_zip + " · CPF " + j.cpf
+          : "Não informado";
+        return "<tr><td><strong>" + escapeHtml(j.full_name) + "</strong></td><td>@" + escapeHtml(j.username) + "</td>" +
+          "<td>" + escapeHtml(j.email) + "<br>" + escapeHtml(j.phone || "") + "</td><td>" + address + "</td>" +
+          '<td><span class="badge ' + (j.role === "master" ? "pink" : "sky") + '">' + j.role + "</span></td></tr>";
+      }).join("") + "</tbody></table>";
+  }
+
+  // ---------------- Claims ----------------
+  function adm_loadClaims() {
+    document.getElementById("admClaimsList").innerHTML = "<p>Carregando...</p>";
+    authedCall("adminGetAllClaims").then(function (claims) {
+      adm_claims = claims;
+      adm_renderClaims();
+    });
+  }
+
+  function adm_renderClaims() {
+    var term = document.getElementById("admClaimSearch").value.toLowerCase();
+    var list = adm_claims.filter(function (c) {
+      return c.username.toLowerCase().indexOf(term) !== -1 || c.full_name.toLowerCase().indexOf(term) !== -1 || c.ceg_name.toLowerCase().indexOf(term) !== -1;
+    });
+    document.getElementById("admClaimsList").innerHTML =
+      "<table><thead><tr><th>Joiner</th><th>CEG</th><th>Status</th><th>Valor</th><th>Prazo</th><th></th></tr></thead><tbody>" +
+      list.map(function (c) {
+        return "<tr><td>" + escapeHtml(c.full_name) + "<br><span class=\"hint\">@" + escapeHtml(c.username) + "</span></td>" +
+          "<td>" + escapeHtml(c.ceg_name) + "</td>" +
+          '<td><select id="admClaimStatus-' + c.id + '">' +
+          Object.keys(CLAIM_STATUS_LABEL_JS).map(function (s) { return '<option value="' + s + '"' + (s === c.status ? " selected" : "") + ">" + CLAIM_STATUS_LABEL_JS[s] + "</option>"; }).join("") +
+          "</select></td>" +
+          '<td><input id="admClaimValue-' + c.id + '" value="' + c.total_value + '" style="width:90px;"></td>' +
+          '<td><input id="admClaimDue-' + c.id + '" type="date" value="' + (c.due_date ? String(c.due_date).slice(0, 10) : "") + '"></td>' +
+          '<td><button class="btn success sm" onclick="adm_saveClaim(\'' + c.id + '\')">Salvar</button></td></tr>';
+      }).join("") + "</tbody></table>";
+  }
+
+  function adm_saveClaim(id) {
+    authedCall("adminUpdateClaim", id, {
+      status: document.getElementById("admClaimStatus-" + id).value,
+      total_value: document.getElementById("admClaimValue-" + id).value,
+      due_date: document.getElementById("admClaimDue-" + id).value,
+    }).then(function () { toast("Claim atualizada!", "success"); adm_loadClaims(); });
+  }
+
+  // ---------------- Avisos ----------------
+  function adm_loadAvisos() {
+    document.getElementById("admAvisoForm").onsubmit = function (e) {
+      e.preventDefault();
+      authedCall("adminSendAviso", {
+        type: document.getElementById("admAvisoType").value,
+        targetUserId: document.getElementById("admAvisoTarget").value,
+        title: document.getElementById("admAvisoTitle").value,
+        message: document.getElementById("admAvisoMessage").value,
+      }).then(function () {
+        toast("Aviso enviado!", "success");
+        e.target.reset();
+        adm_loadAvisosList();
+      });
+    };
+
+    var targetSel = document.getElementById("admAvisoTarget");
+    authedCall("adminGetJoiners").then(function (joiners) {
+      targetSel.innerHTML = '<option value="">📢 Todos os joiners</option>' +
+        joiners.filter(function (j) { return j.role !== "master"; })
+          .map(function (j) { return '<option value="' + j.id + '">@' + escapeHtml(j.username) + "</option>"; }).join("");
+    });
+
+    adm_loadAvisosList();
+  }
+
+  function adm_loadAvisosList() {
+    authedCall("adminGetRecentAvisos").then(function (avisos) {
+      document.getElementById("admAvisosList").innerHTML = avisos.map(function (a) {
+        return '<div style="background:var(--surface-muted); padding:8px 12px; border-radius:var(--radius-control); margin-bottom:6px;"><strong>' +
+          escapeHtml(a.title) + "</strong> — " + formatDate(a.created_at) + "</div>";
+      }).join("");
+    });
+  }
+
+  // ---------------- Aprovações ----------------
+  function adm_setAprovTab(tab) {
+    adm_aprovTab = tab;
+    ["comprovantes", "cotacoes", "pocamarket", "reportes"].forEach(function (t) {
+      document.getElementById("admAprovTab" + t).classList.toggle("active", t === tab);
+    });
+    var content = document.getElementById("admAprovContent");
+    content.innerHTML = "<p>Carregando...</p>";
+
+    if (tab === "comprovantes") {
+      authedCall("adminGetComprovantes").then(function (list) {
+        content.innerHTML = list.length === 0 ? '<div class="empty">📎 Nenhum comprovante enviado.</div>' : list.map(function (c) {
+          return '<div style="border:2px solid var(--sky-100); border-radius:var(--radius-control); padding:10px; margin-bottom:8px;" class="row between">' +
+            "<div><strong>@" + escapeHtml(c.username) + '</strong><p class="hint">' + formatDate(c.created_at) + "</p></div>" +
+            '<div class="row"><a href="' + c.proof_view_url + '" target="_blank" style="color:var(--sky-600);">Ver comprovante</a>' +
+            '<select onchange="adm_updateStatus(\'adminUpdateComprovanteStatus\',\'' + c.id + '\', this.value)">' +
+            ["enviado", "confirmado", "rejeitado"].map(function (s) { return '<option value="' + s + '"' + (s === c.status ? " selected" : "") + ">" + s + "</option>"; }).join("") +
+            "</select></div></div>";
+        }).join("");
+      });
+    }
+
+    if (tab === "cotacoes") {
+      authedCall("adminGetCotacoes").then(function (list) {
+        content.innerHTML = list.length === 0 ? '<div class="empty">💰 Nenhuma cotação enviada.</div>' : list.map(function (c) {
+          return '<div style="border:2px solid var(--sky-100); border-radius:var(--radius-control); padding:10px; margin-bottom:8px;" class="row between">' +
+            "<div><strong>@" + escapeHtml(c.username) + " — " + escapeHtml(c.product_name) + '</strong><p class="hint">US$ ' + c.value_usd + " · " + formatBRL(c.value_brl) + "</p></div>" +
+            '<div class="row">' + (c.proof_view_url ? '<a href="' + c.proof_view_url + '" target="_blank" style="color:var(--sky-600);">Ver comprovante</a>' : "") +
+            '<select onchange="adm_updateStatus(\'adminUpdateCotacaoStatus\',\'' + c.id + '\', this.value)">' +
+            ["pendente", "confirmado", "rejeitado"].map(function (s) { return '<option value="' + s + '"' + (s === c.status ? " selected" : "") + ">" + s + "</option>"; }).join("") +
+            "</select></div></div>";
+        }).join("");
+      });
+    }
+
+    if (tab === "pocamarket") {
+      authedCall("adminGetPocamarket").then(function (list) {
+        content.innerHTML = list.length === 0 ? '<div class="empty">🛒 Nenhum pedido no Pocamarket.</div>' : list.map(function (p) {
+          return '<div style="border:2px solid var(--sky-100); border-radius:var(--radius-control); padding:10px; margin-bottom:8px;">' +
+            '<div class="row between"><div><strong>@' + escapeHtml(p.username) + '</strong><br><a href="' + p.listing_link + '" target="_blank" class="hint">' + escapeHtml(p.group_query || p.listing_link) + "</a></div>" +
+            '<select onchange="adm_updatePocamarket(\'' + p.id + '\', this.value)">' +
+            ["pendente", "em_andamento", "concluido", "cancelado"].map(function (s) { return '<option value="' + s + '"' + (s === p.status ? " selected" : "") + ">" + s + "</option>"; }).join("") +
+            "</select></div>" +
+            '<textarea placeholder="Nota interna" onblur="adm_updatePocamarketNotes(\'' + p.id + '\', this.value)" style="margin-top:6px;">' + escapeHtml(p.admin_notes || "") + "</textarea></div>";
+        }).join("");
+      });
+    }
+
+    if (tab === "reportes") {
+      authedCall("adminGetReportes").then(function (list) {
+        content.innerHTML = list.length === 0 ? '<div class="empty">🐛 Nenhum reporte enviado.</div>' : list.map(function (r) {
+          return '<div style="border:2px solid var(--sky-100); border-radius:var(--radius-control); padding:10px; margin-bottom:8px;">' +
+            '<div class="row between"><div><span class="badge ' + (r.type === "erro" ? "danger" : "sky") + '">' + (r.type === "erro" ? "🐛 Erro" : "💡 Sugestão") + '</span> @' + escapeHtml(r.username) +
+            '<p class="hint">' + escapeHtml(r.message) + "</p></div>" +
+            '<select onchange="adm_updateReporteStatus(\'' + r.id + '\', this.value)">' +
+            ["aberto", "em_analise", "resolvido"].map(function (s) { return '<option value="' + s + '"' + (s === r.status ? " selected" : "") + ">" + s + "</option>"; }).join("") +
+            "</select></div>" +
+            '<textarea placeholder="Responder ao joiner" onblur="adm_updateReporteResponse(\'' + r.id + '\', this.value)" style="margin-top:6px;">' + escapeHtml(r.admin_response || "") + "</textarea></div>";
+        }).join("");
+      });
+    }
+  }
+
+  function adm_updateStatus(fnName, id, status) {
+    authedCall(fnName, id, status).then(function () { toast("Atualizado!", "success"); });
+  }
+  function adm_updatePocamarket(id, status) {
+    authedCall("adminUpdatePocamarket", id, { status: status }).then(function () { toast("Atualizado!", "success"); });
+  }
+  function adm_updatePocamarketNotes(id, notes) {
+    authedCall("adminUpdatePocamarket", id, { admin_notes: notes });
+  }
+  function adm_updateReporteStatus(id, status) {
+    authedCall("adminUpdateReporte", id, { status: status }).then(function () { toast("Atualizado!", "success"); });
+  }
+  function adm_updateReporteResponse(id, response) {
+    authedCall("adminUpdateReporte", id, { admin_response: response });
+  }
+</script>

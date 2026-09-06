@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <?!= include('Styles'); ?>
+</head>
+<body>
+
+  <div id="authWrap">
+    <div class="brand" style="color: var(--sky-700); font-size:1.6rem;">☁️ Cinnamon Cegs</div>
+    <?!= include('Login'); ?>
+    <?!= include('Cadastro'); ?>
+  </div>
+
+  <div id="shell" hidden>
+    <aside id="sidebar"></aside>
+
+    <div id="main">
+      <div id="topbar">
+        <button id="menuToggle" aria-label="Abrir menu">☰</button>
+        <strong id="greeting" class="heading" style="color: var(--sky-800);"></strong>
+      </div>
+      <div id="content">
+        <?!= include('Dashboard'); ?>
+        <?!= include('NovaClaim'); ?>
+        <?!= include('MinhasClaims'); ?>
+        <?!= include('Cotacao'); ?>
+        <?!= include('Repasse'); ?>
+        <?!= include('EnvioNacional'); ?>
+        <?!= include('Comprovante'); ?>
+        <?!= include('Lojinha'); ?>
+        <?!= include('Pocamarket'); ?>
+        <?!= include('Avisos'); ?>
+        <?!= include('Cegs'); ?>
+        <?!= include('Conta'); ?>
+        <?!= include('Reportar'); ?>
+        <?!= include('Admin'); ?>
+        <?!= include('Tutorial'); ?>
+      </div>
+    </div>
+  </div>
+
+  <div id="regrasOverlay" class="hidden" style="position: fixed; inset: 0; background: var(--bg); z-index: 150; overflow-y: auto;">
+    <div style="max-width: 700px; margin: 0 auto; padding: 20px;">
+      <a href="#" onclick="closeRegras(); return false;" style="color: var(--sky-600); font-weight: 700; text-decoration: none;">← Voltar</a>
+      <?!= include('Regras'); ?>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <?!= include('Scripts'); ?>
+  <?!= include('Tour'); ?>
+</body>
+</html>

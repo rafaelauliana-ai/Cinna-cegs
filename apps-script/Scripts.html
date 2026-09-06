@@ -1,0 +1,182 @@
+<script>
+  // ------------------------------------------------------------------
+  // Estado global + helpers de API
+  // ------------------------------------------------------------------
+  window.App = { state: { token: localStorage.getItem("cc_token") || null, user: null } };
+
+  function apiCall(fnName) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function (resolve, reject) {
+      var runner = google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(function (err) { reject(err); });
+      runner[fnName].apply(runner, args);
+    });
+  }
+
+  function authedCall(fnName) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return apiCall.apply(null, [fnName, App.state.token].concat(args));
+  }
+
+  function friendlyError(err) {
+    var msg = (err && err.message) ? err.message : String(err);
+    return msg.replace("SESSAO_INVALIDA", "Sua sessão expirou, entre novamente.");
+  }
+
+  // ------------------------------------------------------------------
+  // Toast
+  // ------------------------------------------------------------------
+  var toastTimer;
+  function toast(msg, type) {
+    var el = document.getElementById("toast");
+    el.textContent = msg;
+    el.className = "show" + (type ? " " + type : "");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.className = ""; }, 3500);
+  }
+
+  // ------------------------------------------------------------------
+  // Formatação
+  // ------------------------------------------------------------------
+  function formatBRL(v) {
+    return (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  }
+  function formatDate(v) {
+    if (!v) return "—";
+    var d = new Date(v);
+    return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("pt-BR");
+  }
+  function escapeHtml(str) {
+    return String(str == null ? "" : str).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function fileToBase64(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(reader.result); };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // Navegação (menu lateral)
+  // ------------------------------------------------------------------
+  var NAV_ITEMS = [
+    { page: "dashboard", label: "Dashboard", icon: "🏠", tour: "Sua página inicial: resumo de itens, valores pendentes, prazos e avisos." },
+    { page: "avisos", label: "Avisos", icon: "🔔", tour: "Notificações do sistema: novas CEGs, status alterado, comprovantes, cotações e mais." },
+    { page: "cegs", label: "CEGs em Andamento", icon: "📊", tour: "Lista de todas as compras em grupo ativas no momento." },
+    { page: "novaClaim", label: "Nova Claim", icon: "➕", tour: "Escolha uma CEG, adicione produtos ao carrinho e confirme seu pedido." },
+    { page: "minhasClaims", label: "Minhas Claims", icon: "📋", tour: "Acompanhe seus pedidos, com filtros e visão em tabela ou cards." },
+    { page: "cotacao", label: "Cotação", icon: "💵", tour: "Converta Dólar para Real (cotação do dia + taxa) e confirme uma compra." },
+    { page: "repasse", label: "Solicitar Repasse", icon: "🔁", tour: "Peça o repasse do valor de claims já pagas/liberadas." },
+    { page: "envioNacional", label: "Envio Nacional", icon: "🚚", tour: "Solicite o envio dos itens liberados, sozinho ou combinado com outro joiner." },
+    { page: "comprovante", label: "Enviar Comprovante", icon: "📤", tour: "Anexe o comprovante de pagamento das suas claims." },
+    { page: "pocamarket", label: "Pocamarket", icon: "🛒", tour: "Busque grupos, envie o link de um anúncio e acompanhe o status." },
+    { page: "lojinha", label: "Lojinha", icon: "🛍️", tour: "Vitrine de itens disponíveis para repasse entre membros." },
+    { page: "reportar", label: "Reportar Erro / Sugestão", icon: "🐛", tour: "Encontrou um bug ou tem uma ideia? Conte pra gente." },
+  ];
+  var NAV_SECONDARY = [
+    { page: "tutorial", label: "Como Usar", icon: "🎓", tour: "Um tour guiado explicando cada parte do site." },
+    { page: "regras", label: "Regras", icon: "📖", tour: "As regras completas da comunidade.", overlay: true },
+    { page: "conta", label: "Minha Conta", icon: "👤", tour: "Seus dados pessoais, endereço e senha." },
+  ];
+  var NAV_ADMIN = { page: "admin", label: "Administração", icon: "🛡️", tour: "Área só sua: gerencie CEGs, produtos, claims e avisos de todo mundo." };
+
+  function renderSidebar() {
+    var el = document.getElementById("sidebar");
+    var isMaster = App.state.user && App.state.user.role === "master";
+    var html = '<div class="brand">☁️ Cinnamon Cegs</div>';
+
+    if (isMaster) html += navLinkHtml(NAV_ADMIN) + '<div class="nav-sep"></div>';
+    NAV_ITEMS.forEach(function (item) { html += navLinkHtml(item); });
+    html += '<div class="nav-sep"></div>';
+    NAV_SECONDARY.forEach(function (item) { html += navLinkHtml(item); });
+    html += '<button class="nav-link" onclick="doLogout()">🚪 Sair</button>';
+
+    el.innerHTML = html;
+  }
+
+  function navLinkHtml(item) {
+    var action = item.overlay ? "openRegras()" : ("navigate('" + item.page + "')");
+    return '<button class="nav-link" data-page="' + item.page + '" data-tour="nav-' + item.page +
+      '" onclick="' + action + '">' +
+      '<span>' + item.icon + '</span>' + escapeHtml(item.label) + "</button>";
+  }
+
+  function openRegras() {
+    document.getElementById("regrasOverlay").classList.remove("hidden");
+    closeSidebarMobile();
+  }
+  function closeRegras() {
+    document.getElementById("regrasOverlay").classList.add("hidden");
+  }
+
+  function navigate(page) {
+    document.querySelectorAll("#content .page").forEach(function (el) { el.hidden = true; });
+    var target = document.getElementById("page-" + page);
+    if (!target) { console.error("página não encontrada:", page); return; }
+    target.hidden = false;
+    document.querySelectorAll(".nav-link").forEach(function (a) {
+      a.classList.toggle("active", a.dataset.page === page);
+    });
+    closeSidebarMobile();
+    var initFn = window["init_" + page];
+    if (typeof initFn === "function") initFn();
+  }
+
+  function toggleSidebar() {
+    document.getElementById("sidebar").classList.toggle("open");
+  }
+  function closeSidebarMobile() {
+    if (window.innerWidth <= 860) document.getElementById("sidebar").classList.remove("open");
+  }
+
+  // ------------------------------------------------------------------
+  // Sessão / boot
+  // ------------------------------------------------------------------
+  function showAuth(page) {
+    document.getElementById("shell").hidden = true;
+    document.getElementById("authWrap").hidden = false;
+    document.querySelectorAll("#authWrap .page").forEach(function (el) { el.hidden = true; });
+    document.getElementById("page-" + page).hidden = false;
+  }
+
+  function onLoggedIn(user, token) {
+    App.state.user = user;
+    if (token) {
+      App.state.token = token;
+      localStorage.setItem("cc_token", token);
+    }
+    document.getElementById("authWrap").hidden = true;
+    document.getElementById("shell").hidden = false;
+    renderSidebar();
+    document.getElementById("greeting").textContent =
+      "Olá, " + ((user.full_name || "").split(" ")[0] || "por aí") + "! 👋";
+    navigate("dashboard");
+  }
+
+  function doLogout() {
+    apiCall("logout", App.state.token).catch(function () {}).then(function () {
+      localStorage.removeItem("cc_token");
+      location.reload();
+    });
+  }
+
+  function boot() {
+    document.getElementById("menuToggle").onclick = toggleSidebar;
+
+    if (App.state.token) {
+      apiCall("checkSession", App.state.token).then(function (user) {
+        if (user) { onLoggedIn(user); }
+        else { localStorage.removeItem("cc_token"); showAuth("login"); }
+      }).catch(function () { showAuth("login"); });
+    } else {
+      showAuth("login");
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", boot);
+</script>
