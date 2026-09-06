@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { Sidebar } from "./Sidebar";
+import { TourProvider } from "@/components/tour/TourContext";
+import { TourOverlay } from "@/components/tour/TourOverlay";
 
 export function AppShell({
   isMaster,
@@ -16,6 +18,7 @@ export function AppShell({
   const [open, setOpen] = useState(false);
 
   return (
+    <TourProvider isMaster={isMaster}>
     <div className="flex min-h-screen">
       {/* Sidebar fixa (desktop) */}
       <aside className="hidden w-64 shrink-0 lg:block">
@@ -56,5 +59,7 @@ export function AppShell({
         </main>
       </div>
     </div>
+    <TourOverlay />
+    </TourProvider>
   );
 }
