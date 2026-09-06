@@ -1,0 +1,59 @@
+<section class="page" id="page-repasse" hidden>
+  <div class="card">
+    <div class="card-header">🔁 Solicitar Repasse</div>
+    <div class="card-body">
+      <p class="hint">Selecione as claims elegíveis (já pagas/confirmadas) para solicitar o repasse.</p>
+      <div id="repList"><p>Carregando...</p></div>
+      <button class="btn success" id="repBtn" style="margin-top: 12px;" onclick="rep_submit()">Solicitar repasse</button>
+
+      <div style="border-top: 1px solid var(--sky-100); margin-top: 20px; padding-top: 16px;">
+        <h3 class="heading" style="color: var(--sky-700);">📦 Meus repasses solicitados</h3>
+        <div id="repHistory"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  var rep_selected = [];
+
+  function init_repasse() {
+    rep_selected = [];
+    document.getElementById("repList").innerHTML = "<p>Carregando...</p>";
+    authedCall("getEligibleForRepasse").then(function (claims) {
+      var el = document.getElementById("repList");
+      if (claims.length === 0) { el.innerHTML = '<div class="empty">🔁 Nenhuma claim elegível no momento.</div>'; return; }
+      el.innerHTML = claims.map(function (c) {
+        return '<label class="row" style="border:2px solid var(--sky-100); border-radius:var(--radius-control); padding:10px; margin-bottom:8px;">' +
+          '<input type="checkbox" onchange="rep_toggle(\'' + c.id + '\', this.checked)" style="width:auto;">' +
+          '<span style="flex:1;">' + escapeHtml(c.ceg_name) + " — " + CLAIM_STATUS_LABEL_JS[c.status] + "</span>" +
+          "<strong>" + formatBRL(c.total_value) + "</strong></label>";
+      }).join("");
+    });
+
+    authedCall("getMyRepasses").then(function (repasses) {
+      var el = document.getElementById("repHistory");
+      if (repasses.length === 0) { el.innerHTML = '<p class="hint">Nenhuma solicitação ainda.</p>'; return; }
+      el.innerHTML = repasses.map(function (r) {
+        return '<div class="row between" style="background:var(--surface-muted); padding:10px; border-radius:var(--radius-control); margin-bottom:6px;">' +
+          "<span>Solicitado em " + formatDate(r.created_at) + '</span><span class="badge ' + (r.status === "pago" ? "success" : "sky") + '">' + r.status + "</span></div>";
+      }).join("");
+    });
+  }
+
+  function rep_toggle(id, checked) {
+    if (checked) rep_selected.push(id);
+    else rep_selected = rep_selected.filter(function (i) { return i !== id; });
+  }
+
+  function rep_submit() {
+    if (rep_selected.length === 0) { toast("Selecione ao menos uma claim.", "error"); return; }
+    var btn = document.getElementById("repBtn");
+    btn.disabled = true;
+    authedCall("requestRepasse", rep_selected).then(function () {
+      toast("Repasse solicitado!", "success");
+      init_repasse();
+    }).catch(function (err) { toast(friendlyError(err), "error"); })
+      .finally(function () { btn.disabled = false; });
+  }
+</script>

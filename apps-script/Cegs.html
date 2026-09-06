@@ -1,0 +1,23 @@
+<section class="page" id="page-cegs" hidden>
+  <div class="card">
+    <div class="card-header">📊 CEGs em Andamento</div>
+    <div class="card-body" id="cegsList"><p>Carregando...</p></div>
+  </div>
+</section>
+
+<script>
+  var CEG_STATUS_LABEL = { em_andamento: "Em andamento", finalizada: "Finalizada", cancelada: "Cancelada" };
+  var CEG_STATUS_TONE = { em_andamento: "warning", finalizada: "success", cancelada: "danger" };
+
+  function init_cegs() {
+    var el = document.getElementById("cegsList");
+    el.innerHTML = "<p>Carregando...</p>";
+    authedCall("listCegs").then(function (cegs) {
+      if (cegs.length === 0) { el.innerHTML = '<div class="empty">🌱 Nenhuma CEG cadastrada ainda.</div>'; return; }
+      el.innerHTML = cegs.map(function (c) {
+        return '<div class="row between" style="padding: 12px 0; border-top: 1px solid var(--sky-100);">' +
+          "<strong>" + escapeHtml(c.name) + '</strong><span class="badge ' + CEG_STATUS_TONE[c.status] + '">' + CEG_STATUS_LABEL[c.status] + "</span></div>";
+      }).join("");
+    });
+  }
+</script>

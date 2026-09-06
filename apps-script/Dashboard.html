@@ -1,0 +1,53 @@
+<section class="page" id="page-dashboard" hidden>
+  <div class="card">
+    <div class="card-body">
+      Seja bem-vinde ao painel da <strong>Cinnamon Cegs</strong>! Aqui você acompanha suas
+      claims, valores pendentes, prazos e avisos em um só lugar.
+    </div>
+  </div>
+
+  <div class="stat-grid" id="dashStats" data-tour="dashboard-stats">
+    <p>Carregando...</p>
+  </div>
+
+  <div class="card" style="margin-top: 20px;">
+    <div class="card-header">📋 Prazo de pagamento próximo (até 5 dias)</div>
+    <div class="card-body" id="dashUpcoming"></div>
+  </div>
+</section>
+
+<script>
+  function statCardHtml(icon, label, value, hint, tone) {
+    return '<div class="stat-card tone-' + tone + '">' +
+      '<div class="label">' + icon + " " + label + "</div>" +
+      '<div class="value">' + value + "</div>" +
+      (hint ? '<div class="hint">' + hint + "</div>" : "") +
+      "</div>";
+  }
+
+  function init_dashboard() {
+    var statsEl = document.getElementById("dashStats");
+    var upcomingEl = document.getElementById("dashUpcoming");
+    statsEl.innerHTML = "<p>Carregando...</p>";
+
+    authedCall("getDashboardStats").then(function (s) {
+      statsEl.innerHTML =
+        statCardHtml("📦", "Total de Itens", s.totalItens, "", "sky") +
+        statCardHtml("💰", "Valor Pendente", formatBRL(s.valorPendente), "Pagamento de itens", "danger") +
+        statCardHtml("📅", "Prazos Próximos", s.prazosProximos.length, "Até 5 dias", "warning") +
+        statCardHtml("⏰", "Itens em Atraso", s.itensEmAtraso, "Prazo vencido", "danger") +
+        statCardHtml("🔔", "Avisos", s.avisosNaoVisualizados, "Não visualizados", "pink");
+
+      if (s.prazosProximos.length === 0) {
+        upcomingEl.innerHTML = '<div class="empty">🗓️ Nenhuma claim com prazo próximo.</div>';
+      } else {
+        upcomingEl.innerHTML = s.prazosProximos.map(function (c) {
+          return '<div class="row between" style="background: var(--surface-muted); padding: 12px; border-radius: var(--radius-control); margin-bottom: 8px;">' +
+            "<div><span class=\"badge sky\">" + escapeHtml(c.ceg_name) + "</span>" +
+            '<p class="hint">Vence em ' + formatDate(c.due_date) + "</p></div>" +
+            '<strong style="color: var(--sky-700);">' + formatBRL(c.total_value) + "</strong></div>";
+        }).join("");
+      }
+    }).catch(function (err) { toast(friendlyError(err), "error"); });
+  }
+</script>

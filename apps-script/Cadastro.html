@@ -1,0 +1,72 @@
+<section class="page" id="page-cadastro" hidden>
+  <div class="card">
+    <div class="card-header">📝 Criar Conta</div>
+    <div class="card-body">
+      <form id="cadastroForm">
+        <div class="field"><label for="cadNome">Nome</label><input id="cadNome" required></div>
+        <div class="field"><label for="cadUsername">@ (identificador único)</label><input id="cadUsername" placeholder="@seuUsuario" required></div>
+        <div class="field"><label for="cadEmail">E-mail</label><input id="cadEmail" type="email" placeholder="seu@email.com" required></div>
+        <div class="field">
+          <label for="cadPhone">Telefone (com DDD)</label>
+          <input id="cadPhone" placeholder="11999999999" required>
+          <p class="hint">Digite apenas números, incluindo DDD.</p>
+        </div>
+        <div class="field"><label for="cadPassword">Senha</label><input id="cadPassword" type="password" required></div>
+        <div class="field"><label for="cadPassword2">Confirmar senha</label><input id="cadPassword2" type="password" required></div>
+        <div class="field" style="display: flex; gap: 8px; align-items: flex-start;">
+          <input id="cadRules" type="checkbox" style="width: auto; margin-top: 4px;">
+          <label for="cadRules" style="font-weight: 400;">
+            Li e concordo com as
+            <a href="#" onclick="openRegras(); return false;" style="color: var(--sky-600); font-weight: 700;">regras e termos da CEG</a>
+          </label>
+        </div>
+        <p id="cadError" style="color: var(--danger-700); font-weight: 700; display: none;"></p>
+        <button class="btn" type="submit" style="width: 100%;">Criar conta</button>
+      </form>
+      <p style="text-align: center; margin-top: 16px; font-size: 0.9rem;">
+        Já tem conta?
+        <a href="#" onclick="showAuth('login'); return false;" style="color: var(--sky-600); font-weight: 700; text-decoration: none;">Faça login</a>
+      </p>
+    </div>
+  </div>
+</section>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    document.getElementById("cadastroForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var btn = e.target.querySelector("button");
+      var errEl = document.getElementById("cadError");
+      errEl.style.display = "none";
+
+      var password = document.getElementById("cadPassword").value;
+      var password2 = document.getElementById("cadPassword2").value;
+      if (password !== password2) {
+        errEl.textContent = "As senhas não coincidem.";
+        errEl.style.display = "block";
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "Criando...";
+
+      apiCall("signup", {
+        fullName: document.getElementById("cadNome").value,
+        username: document.getElementById("cadUsername").value,
+        email: document.getElementById("cadEmail").value,
+        phone: document.getElementById("cadPhone").value,
+        password: password,
+        acceptedRules: document.getElementById("cadRules").checked,
+      })
+        .then(function (res) { onLoggedIn(res.user, res.token); })
+        .catch(function (err) {
+          errEl.textContent = friendlyError(err);
+          errEl.style.display = "block";
+        })
+        .finally(function () {
+          btn.disabled = false;
+          btn.textContent = "Criar conta";
+        });
+    });
+  });
+</script>

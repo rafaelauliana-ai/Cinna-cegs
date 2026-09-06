@@ -1,0 +1,133 @@
+<section class="page" id="page-novaClaim" hidden>
+  <div class="card">
+    <div class="card-header">➕ Nova Claim</div>
+    <div class="card-body">
+      <div class="field">
+        <label for="ncCeg">Selecione a CEG:</label>
+        <select id="ncCeg" onchange="nc_onCegChange()"><option value="">Selecione a CEG</option></select>
+      </div>
+
+      <p style="font-weight: 700; margin-bottom: 8px;">Selecione um produto:</p>
+      <div id="ncProducts"><p class="hint">Selecione uma CEG para ver os produtos.</p></div>
+
+      <p style="font-weight: 700; margin: 16px 0 8px;">🛒 Carrinho (<span id="ncCartCount">0</span> itens)</p>
+      <div id="ncCart"><p class="hint">Nenhum item no carrinho.</p></div>
+
+      <div class="row between" style="border-top: 1px solid var(--sky-100); padding-top: 16px; margin-top: 12px;">
+        <strong class="heading" style="font-size: 1.1rem;">Total: <span id="ncTotal">R$ 0,00</span></strong>
+        <div class="row">
+          <button class="btn secondary" onclick="nc_clearCart()">Limpar Carrinho</button>
+          <button class="btn success" id="ncConfirmBtn" onclick="nc_confirm()">✅ Confirmar Claim</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  var nc_products = [];
+  var nc_cart = [];
+  var nc_variationChoice = {};
+
+  function init_novaClaim() {
+    nc_cart = [];
+    nc_renderCart();
+    var select = document.getElementById("ncCeg");
+    select.innerHTML = '<option value="">Selecione a CEG</option>';
+    authedCall("listActiveCegs").then(function (cegs) {
+      cegs.forEach(function (c) {
+        var opt = document.createElement("option");
+        opt.value = c.id; opt.textContent = c.name;
+        select.appendChild(opt);
+      });
+    });
+    document.getElementById("ncProducts").innerHTML = '<p class="hint">Selecione uma CEG para ver os produtos.</p>';
+  }
+
+  function nc_onCegChange() {
+    var cegId = document.getElementById("ncCeg").value;
+    var el = document.getElementById("ncProducts");
+    if (!cegId) { el.innerHTML = '<p class="hint">Selecione uma CEG para ver os produtos.</p>'; return; }
+    el.innerHTML = "<p>Carregando produtos...</p>";
+    authedCall("listProducts", cegId).then(function (products) {
+      nc_products = products;
+      if (products.length === 0) { el.innerHTML = '<div class="empty">🛍️ Nenhum produto cadastrado nessa CEG ainda.</div>'; return; }
+      el.innerHTML = products.map(nc_productRow).join("");
+    });
+  }
+
+  function nc_productRow(p) {
+    var variationsHtml = "";
+    if (p.variations.length > 0) {
+      variationsHtml = '<select onchange="nc_variationChoice[\'' + p.id + '\']=this.value" style="margin-top:8px;">' +
+        '<option value="">Escolha a variação</option>' +
+        p.variations.map(function (v) { return '<option value="' + escapeHtml(v) + '">' + escapeHtml(v) + "</option>"; }).join("") +
+        "</select>";
+    }
+    return '<div class="row" style="border: 2px solid var(--sky-100); border-radius: var(--radius-control); padding: 12px; margin-bottom: 10px; align-items: flex-start;">' +
+      (p.image_url ? '<img src="' + p.image_url + '" style="width:56px;height:56px;border-radius:var(--radius-control);object-fit:cover;">' : "") +
+      '<div style="flex:1;"><strong>' + escapeHtml(p.name) + " — " + formatBRL(p.price) + "</strong>" +
+      (p.variations.length > 0 ? '<div><span class="badge neutral">' + p.variations.length + " variações</span></div>" : "") +
+      variationsHtml + "</div>" +
+      '<button class="btn secondary sm" onclick="nc_addToCart(\'' + p.id + '\')">Adicionar</button>' +
+      "</div>";
+  }
+
+  function nc_addToCart(productId) {
+    var product = nc_products.filter(function (p) { return p.id === productId; })[0];
+    if (!product) return;
+    if (product.variations.length > 0 && !nc_variationChoice[productId]) {
+      toast("Escolha a variação primeiro.", "error");
+      return;
+    }
+    var variation = nc_variationChoice[productId] || null;
+    var key = productId + "::" + (variation || "");
+    var existing = nc_cart.filter(function (i) { return i.key === key; })[0];
+    if (existing) { existing.quantity++; }
+    else {
+      nc_cart.push({ key: key, productId: productId, productName: product.name, variation: variation, unitPrice: product.price, quantity: 1 });
+    }
+    nc_renderCart();
+  }
+
+  function nc_removeFromCart(key) {
+    nc_cart = nc_cart.filter(function (i) { return i.key !== key; });
+    nc_renderCart();
+  }
+
+  function nc_clearCart() { nc_cart = []; nc_renderCart(); }
+
+  function nc_renderCart() {
+    var el = document.getElementById("ncCart");
+    document.getElementById("ncCartCount").textContent = nc_cart.length;
+    var total = nc_cart.reduce(function (sum, i) { return sum + i.unitPrice * i.quantity; }, 0);
+    document.getElementById("ncTotal").textContent = formatBRL(total);
+
+    if (nc_cart.length === 0) { el.innerHTML = '<p class="hint">Nenhum item no carrinho.</p>'; return; }
+    el.innerHTML = nc_cart.map(function (i) {
+      return '<div class="row between" style="background: var(--surface-muted); padding: 8px 12px; border-radius: var(--radius-control); margin-bottom: 6px;">' +
+        "<span>" + i.quantity + "× " + escapeHtml(i.productName) + (i.variation ? " (" + escapeHtml(i.variation) + ")" : "") + "</span>" +
+        '<span><strong>' + formatBRL(i.unitPrice * i.quantity) + '</strong> <a href="#" onclick="nc_removeFromCart(\'' + i.key + '\'); return false;" style="color: var(--danger-700); margin-left: 8px;">remover</a></span>' +
+        "</div>";
+    }).join("");
+  }
+
+  function nc_confirm() {
+    var cegId = document.getElementById("ncCeg").value;
+    if (!cegId || nc_cart.length === 0) { toast("Selecione a CEG e adicione itens ao carrinho.", "error"); return; }
+
+    var btn = document.getElementById("ncConfirmBtn");
+    btn.disabled = true; btn.textContent = "Enviando...";
+
+    authedCall("createClaim", {
+      cegId: cegId,
+      items: nc_cart.map(function (i) {
+        return { productId: i.productId, productName: i.productName, variation: i.variation, unitPrice: i.unitPrice, quantity: i.quantity };
+      }),
+    }).then(function () {
+      toast("Claim confirmada! 🎉", "success");
+      navigate("minhasClaims");
+    }).catch(function (err) { toast(friendlyError(err), "error"); })
+      .finally(function () { btn.disabled = false; btn.textContent = "✅ Confirmar Claim"; });
+  }
+</script>

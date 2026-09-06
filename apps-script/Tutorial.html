@@ -1,0 +1,31 @@
+<section class="page" id="page-tutorial" hidden>
+  <div class="card">
+    <div class="card-header">🎓 Como Usar</div>
+    <div class="card-body" style="text-align: center;">
+      <span style="font-size: 2.5rem;">🧭☁️</span>
+      <p style="max-width: 420px; margin: 12px auto;">
+        Clique no botão abaixo para começar um tour guiado: eu vou destacando cada parte do
+        site e explicando pra que ela serve. Você avança clicando em <strong>"Próximo"</strong>
+        ou direto no item destacado.
+      </p>
+      <button class="btn" style="padding: 12px 28px;" onclick="tour_start()">▶️ Começar tour guiado</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">📚 Resumo rápido</div>
+    <div class="card-body" id="tutorialSummary"></div>
+  </div>
+</section>
+
+<script>
+  function init_tutorial() {
+    var isMaster = App.state.user && App.state.user.role === "master";
+    var items = [].concat(isMaster ? [NAV_ADMIN] : [], NAV_ITEMS, NAV_SECONDARY);
+    document.getElementById("tutorialSummary").innerHTML = items.map(function (item) {
+      return '<div class="row" style="align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--sky-100);">' +
+        '<span style="font-size: 1.2rem;">' + item.icon + "</span>" +
+        "<div><strong>" + escapeHtml(item.label) + "</strong><p class=\"hint\">" + escapeHtml(item.tour) + "</p></div></div>";
+    }).join("");
+  }
+</script>

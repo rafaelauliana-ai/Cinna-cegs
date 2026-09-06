@@ -1,0 +1,55 @@
+<section class="page" id="page-reportar" hidden>
+  <div class="card">
+    <div class="card-header">🐛 Reportar Erro / Sugestão</div>
+    <div class="card-body">
+      <form id="rpForm">
+        <div class="field">
+          <label>Tipo</label>
+          <select id="rpType"><option value="sugestao">💡 Sugestão</option><option value="erro">🐛 Erro / Bug</option></select>
+        </div>
+        <div class="field"><label>Conte pra gente</label><textarea id="rpMessage" rows="4" required></textarea></div>
+        <button class="btn" type="submit" style="width: 100%;">Enviar</button>
+      </form>
+
+      <h3 class="heading" style="color: var(--sky-700); margin-top: 20px;">Meus reportes</h3>
+      <div id="rpList"><p>Carregando...</p></div>
+    </div>
+  </div>
+</section>
+
+<script>
+  var RP_STATUS_TONE = { aberto: "warning", em_analise: "sky", resolvido: "success" };
+
+  function init_reportar() {
+    document.getElementById("rpForm").onsubmit = rp_submit;
+    rp_load();
+  }
+
+  function rp_load() {
+    var el = document.getElementById("rpList");
+    el.innerHTML = "<p>Carregando...</p>";
+    authedCall("getMyReportes").then(function (list) {
+      if (list.length === 0) { el.innerHTML = '<div class="empty">🐛 Nenhum reporte enviado ainda.</div>'; return; }
+      el.innerHTML = list.map(function (r) {
+        return '<div style="border:2px solid var(--sky-100); border-radius:var(--radius-control); padding:12px; margin-bottom:8px;">' +
+          '<div class="row between"><span>' + (r.type === "erro" ? "🐛 Erro" : "💡 Sugestão") + '</span><span class="badge ' + RP_STATUS_TONE[r.status] + '">' + r.status + "</span></div>" +
+          '<p class="hint">' + escapeHtml(r.message) + "</p>" +
+          (r.admin_response ? '<p style="color:var(--sky-700);">💬 ' + escapeHtml(r.admin_response) + "</p>" : "") +
+          '<p class="hint">' + formatDate(r.created_at) + "</p></div>";
+      }).join("");
+    });
+  }
+
+  function rp_submit(e) {
+    e.preventDefault();
+    var btn = e.target.querySelector("button");
+    btn.disabled = true;
+    authedCall("createReporte", { type: document.getElementById("rpType").value, message: document.getElementById("rpMessage").value })
+      .then(function () {
+        toast("Enviado, obrigada! 💙", "success");
+        e.target.reset();
+        rp_load();
+      }).catch(function (err) { toast(friendlyError(err), "error"); })
+      .finally(function () { btn.disabled = false; });
+  }
+</script>

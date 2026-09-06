@@ -1,0 +1,91 @@
+<section class="page" id="page-cotacao" hidden>
+  <div class="card">
+    <div class="card-header">💵 Cotação em Dólar</div>
+    <div class="card-body">
+      <h3 class="heading" style="color: var(--sky-700);">📊 Calcular valor em Real</h3>
+      <p id="cotRateInfo" class="hint"></p>
+
+      <div class="field"><label>Valor em Dólar (US$)</label><input id="cotUsdInput" placeholder="Ex: 30"></div>
+      <button class="btn" style="width: 100%;" onclick="cot_calculate()">Calcular</button>
+      <div class="field" style="margin-top: 12px;"><label>Valor estimado em Real (R$)</label><input id="cotEstimated" readonly></div>
+      <button class="btn success" style="width: 100%;" onclick="cot_useEstimated()">Usar este valor</button>
+
+      <form id="cotForm" style="border-top: 1px solid var(--sky-100); margin-top: 20px; padding-top: 16px;">
+        <h3 class="heading" style="color: var(--success-700);">✅ Confirmar Compra</h3>
+        <p class="hint">Preencha os dados abaixo. Caso o produto dê sold, o dinheiro é devolvido.</p>
+
+        <div class="field"><label>Nome do Produto *</label><input id="cotProductName" required></div>
+        <div class="field"><label>Valor em Dólar (US$) *</label><input id="cotValueUsd" required></div>
+        <div class="field"><label>Valor em Real (R$) *</label><input id="cotValueBrl" required></div>
+        <div class="field"><label>Link do produto *</label><input id="cotProductLink" type="url" required></div>
+        <div class="field">
+          <label>Comprovante de pagamento *</label>
+          <input id="cotProof" type="file" accept=".pdf,.jpg,.jpeg,.png" required>
+        </div>
+        <p id="cotError" style="color: var(--danger-700); font-weight: 700; display: none;"></p>
+        <button class="btn success" type="submit" style="width: 100%;">✅ Confirmar Compra</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<script>
+  var cot_rateInfo = null;
+
+  function init_cotacao() {
+    document.getElementById("cotForm").onsubmit = cot_submit;
+    document.getElementById("cotRateInfo").textContent = "Buscando cotação do dia...";
+    authedCall("getExchangeRate").then(function (info) {
+      cot_rateInfo = info;
+      document.getElementById("cotRateInfo").innerHTML =
+        "Cotação de hoje: <strong>US$ 1 = " + formatBRL(info.rate) + "</strong> (+ taxa fixa de " + formatBRL(info.markup) + ")";
+    }).catch(function (err) {
+      document.getElementById("cotRateInfo").textContent = friendlyError(err);
+    });
+  }
+
+  function cot_calculate() {
+    if (!cot_rateInfo) { toast("Aguarde a cotação carregar.", "error"); return; }
+    var usd = Number(document.getElementById("cotUsdInput").value);
+    if (!isFinite(usd)) return;
+    var total = usd * cot_rateInfo.rate + cot_rateInfo.markup;
+    document.getElementById("cotEstimated").value = formatBRL(total);
+  }
+
+  function cot_useEstimated() {
+    var estimated = document.getElementById("cotEstimated").value;
+    if (!estimated) return;
+    document.getElementById("cotValueUsd").value = document.getElementById("cotUsdInput").value;
+    document.getElementById("cotValueBrl").value = estimated.replace(/[^\d,.-]/g, "").replace(",", ".");
+  }
+
+  function cot_submit(e) {
+    e.preventDefault();
+    var errEl = document.getElementById("cotError");
+    errEl.style.display = "none";
+    var fileInput = document.getElementById("cotProof");
+    if (!fileInput.files[0]) { errEl.textContent = "Anexe o comprovante."; errEl.style.display = "block"; return; }
+
+    var btn = e.target.querySelector("button[type=submit]");
+    btn.disabled = true; btn.textContent = "Enviando...";
+
+    fileToBase64(fileInput.files[0]).then(function (base64) {
+      return authedCall("uploadFile", { base64: base64, filename: fileInput.files[0].name, mimeType: fileInput.files[0].type, subFolder: "cotacoes" });
+    }).then(function (uploaded) {
+      return authedCall("confirmCotacao", {
+        productName: document.getElementById("cotProductName").value,
+        valueUsd: document.getElementById("cotValueUsd").value,
+        valueBrl: document.getElementById("cotValueBrl").value,
+        productLink: document.getElementById("cotProductLink").value,
+        proofFileId: uploaded.fileId,
+      });
+    }).then(function () {
+      toast("Compra confirmada! Obrigada 💙", "success");
+      document.getElementById("cotForm").reset();
+      document.getElementById("cotEstimated").value = "";
+    }).catch(function (err) {
+      errEl.textContent = friendlyError(err);
+      errEl.style.display = "block";
+    }).finally(function () { btn.disabled = false; btn.textContent = "✅ Confirmar Compra"; });
+  }
+</script>

@@ -1,0 +1,109 @@
+<section class="page" id="page-minhasClaims" hidden>
+  <div class="card">
+    <div class="card-header">
+      📋 Minhas Claims
+      <div class="toggle-group">
+        <button id="mcViewTabela" class="active" onclick="mc_setView('tabela')">▦ Tabela</button>
+        <button id="mcViewBox" onclick="mc_setView('box')">▤ Box</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="row" style="margin-bottom: 16px;">
+        <select id="mcFilterCeg" onchange="mc_render()" style="flex: 1; min-width: 140px;"><option value="todas">Todas as CEGs</option></select>
+        <select id="mcFilterStatus" onchange="mc_render()" style="flex: 1; min-width: 140px;"><option value="todos">Todos os status</option></select>
+        <select id="mcSort" onchange="mc_render()" style="flex: 1; min-width: 140px;">
+          <option value="recente">Data (mais recente)</option>
+          <option value="antiga">Data (mais antiga)</option>
+          <option value="valor_maior">Valor (maior)</option>
+          <option value="valor_menor">Valor (menor)</option>
+        </select>
+      </div>
+      <div id="mcList"><p>Carregando...</p></div>
+      <button class="btn" style="margin-top: 16px;" onclick="navigate('novaClaim')">➕ Nova Claim</button>
+    </div>
+  </div>
+</section>
+
+<script>
+  var mc_claims = [];
+  var mc_view = "tabela";
+  var CLAIM_STATUS_LABEL_JS = {
+    nao_confirmado: "Não Confirmado", aguardando_pagamento: "Aguardando Pagamento", pago: "Pago",
+    cotacao_pendente: "Cotação Pendente", comprado: "Comprado", aguardando_repasse: "Aguardando Repasse",
+    nacional_liberado: "Nacional Liberado", envio_solicitado: "Envio Solicitado", enviado: "Enviado",
+    entregue: "Entregue", cancelado: "Cancelado",
+  };
+  var CLAIM_STATUS_TONE_JS = {
+    nao_confirmado: "neutral", aguardando_pagamento: "warning", pago: "success", cotacao_pendente: "pink",
+    comprado: "sky", aguardando_repasse: "pink", nacional_liberado: "success", envio_solicitado: "sky",
+    enviado: "sky", entregue: "success", cancelado: "danger",
+  };
+
+  function init_minhasClaims() {
+    document.getElementById("mcList").innerHTML = "<p>Carregando...</p>";
+    authedCall("getMyClaims").then(function (claims) {
+      mc_claims = claims;
+
+      var cegSel = document.getElementById("mcFilterCeg");
+      var cegNames = Array.from(new Set(claims.map(function (c) { return c.ceg_name; })));
+      cegSel.innerHTML = '<option value="todas">Todas as CEGs</option>' +
+        cegNames.map(function (n) { return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + "</option>"; }).join("");
+
+      var statusSel = document.getElementById("mcFilterStatus");
+      statusSel.innerHTML = '<option value="todos">Todos os status</option>' +
+        Object.keys(CLAIM_STATUS_LABEL_JS).map(function (s) { return '<option value="' + s + '">' + CLAIM_STATUS_LABEL_JS[s] + "</option>"; }).join("");
+
+      mc_render();
+    }).catch(function (err) { toast(friendlyError(err), "error"); });
+  }
+
+  function mc_setView(view) {
+    mc_view = view;
+    document.getElementById("mcViewTabela").classList.toggle("active", view === "tabela");
+    document.getElementById("mcViewBox").classList.toggle("active", view === "box");
+    mc_render();
+  }
+
+  function mc_render() {
+    var cegFilter = document.getElementById("mcFilterCeg").value;
+    var statusFilter = document.getElementById("mcFilterStatus").value;
+    var sort = document.getElementById("mcSort").value;
+
+    var list = mc_claims.filter(function (c) {
+      if (cegFilter !== "todas" && c.ceg_name !== cegFilter) return false;
+      if (statusFilter !== "todos" && c.status !== statusFilter) return false;
+      return true;
+    });
+
+    list.sort(function (a, b) {
+      if (sort === "antiga") return new Date(a.created_at) - new Date(b.created_at);
+      if (sort === "valor_maior") return b.total_value - a.total_value;
+      if (sort === "valor_menor") return a.total_value - b.total_value;
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+
+    var el = document.getElementById("mcList");
+    if (list.length === 0) { el.innerHTML = '<div class="empty">📭 Nenhuma claim encontrada.</div>'; return; }
+
+    if (mc_view === "tabela") {
+      el.innerHTML = '<div style="overflow-x:auto;"><table><thead><tr><th>CEG</th><th>Status</th><th>Itens</th><th>Valor</th><th>Prazo</th></tr></thead><tbody>' +
+        list.map(function (c) {
+          return "<tr><td><strong>" + escapeHtml(c.ceg_name) + "</strong></td>" +
+            '<td><span class="badge ' + CLAIM_STATUS_TONE_JS[c.status] + '">' + CLAIM_STATUS_LABEL_JS[c.status] + "</span></td>" +
+            "<td>" + c.items.length + "</td><td>" + formatBRL(c.total_value) + "</td><td>" + formatDate(c.due_date) + "</td></tr>";
+        }).join("") + "</tbody></table></div>";
+    } else {
+      el.innerHTML = '<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px;">' +
+        list.map(function (c) {
+          return '<div style="border:2px solid var(--sky-100); border-radius:var(--radius-card); padding:14px;">' +
+            '<div class="row between"><strong>' + escapeHtml(c.ceg_name) + '</strong><span class="badge ' + CLAIM_STATUS_TONE_JS[c.status] + '">' + CLAIM_STATUS_LABEL_JS[c.status] + "</span></div>" +
+            '<ul style="font-size:0.85rem; color:var(--fg-muted); padding-left:18px; margin:8px 0;">' +
+            c.items.map(function (i) { return "<li>" + i.quantity + "× " + escapeHtml(i.product_name) + (i.variation ? " (" + escapeHtml(i.variation) + ")" : "") + "</li>"; }).join("") +
+            "</ul>" +
+            '<div class="row between" style="border-top:1px solid var(--sky-100); padding-top:8px;">' +
+            '<span class="hint">Prazo: ' + formatDate(c.due_date) + '</span><strong style="color:var(--sky-700);">' + formatBRL(c.total_value) + "</strong></div>" +
+            "</div>";
+        }).join("") + "</div>";
+    }
+  }
+</script>
