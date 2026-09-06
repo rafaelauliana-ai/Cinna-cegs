@@ -2,11 +2,16 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_ROUTES = ["/login", "/cadastro"];
-const ALWAYS_PUBLIC_ROUTES = ["/regras"];
+const ALWAYS_PUBLIC_ROUTES = ["/regras", "/preview"];
 const ADMIN_PREFIX = "/admin";
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
+
+  const { pathname } = request.nextUrl;
+  if (ALWAYS_PUBLIC_ROUTES.some((route) => pathname.startsWith(route))) {
+    return response;
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,13 +36,7 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
   const isPublicRoute = PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
-  const isAlwaysPublicRoute = ALWAYS_PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
-
-  if (isAlwaysPublicRoute) {
-    return response;
-  }
 
   if (!user && !isPublicRoute && pathname !== "/") {
     const url = request.nextUrl.clone();
